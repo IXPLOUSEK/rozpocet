@@ -53,7 +53,7 @@ await ctx.addInitScript(d => {
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push('pageerror: ' + e.message));
-page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+page.on('console', m => { if (m.type() === 'error' && !/interactive-widget/i.test(m.text())) errs.push('console: ' + m.text()); });
 
 await page.goto(`http://127.0.0.1:${PORT}/rozpocet.html`, { waitUntil: 'load' });
 await page.waitForTimeout(600);

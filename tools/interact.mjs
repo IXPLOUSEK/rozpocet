@@ -45,7 +45,7 @@ const ctx = await browser.newContext({ ...pw.devices['iPhone 15'], locale: 'cs-C
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
-page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+page.on('console', m => { if (m.type() === 'error' && !/interactive-widget/i.test(m.text())) errs.push(m.text()); });
 
 let pass = 0, fail = 0;
 const ok = (n, c, d) => { c ? pass++ : (fail++, console.log('FAIL  ' + n + (d !== undefined ? '  ' + d : ''))); };

@@ -61,7 +61,10 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage();
 const errors = [], reqs = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
-page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+// Safari hlásí neznámý klíč viewportu jako chybu konzole. Je to jeho
+// vlastní upozornění na funkci, kterou nezná, ne chyba aplikace.
+const NESKODNE = /Viewport argument key "interactive-widget" not recognized/i;
+page.on('console', m => { if (m.type() === 'error' && !NESKODNE.test(m.text())) errors.push('console: ' + m.text()); });
 page.on('request', r => reqs.push(r.url()));
 
 let pass = 0, fail = 0;

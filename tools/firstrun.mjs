@@ -19,7 +19,7 @@ let browser; try{browser=await (process.argv.includes('--webkit')?pw.webkit:pw.c
 catch(e){browser=await pw.chromium.launch({executablePath:'/usr/bin/google-chrome'});}
 const ctx=await browser.newContext({...pw.devices['iPhone 15'],locale:'cs-CZ',timezoneId:'Europe/Prague'});
 const p=await ctx.newPage();
-const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
+const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>{if(m.type()==='error' && !/interactive-widget/i.test(m.text()))errs.push(m.text());});
 let pass=0,fail=0; const ok=(n,c,d)=>{c?pass++:(fail++,console.log('FAIL  '+n+(d!==undefined?'  '+d:'')));};
 mkdirSync('test/artefakty',{recursive:true});
 
