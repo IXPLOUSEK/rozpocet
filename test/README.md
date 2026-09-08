@@ -243,10 +243,25 @@ ne: vodorovné přetečení na 320 px. A naopak — `mouse.wheel` mobilní WebKi
 vůbec neumí a `el.focus()` v něm neroluje vnořené oblasti, takže testy, které
 se o tohle opíraly, měřily prohlížeč, ne appku. Obojí je opravené.
 
-**Známé omezení:** Playwrightí WebKit v téhle sestavě nespouští service workery.
-Kdyby sem přibyla offline suita, projde v Chromiu a spadne ve WebKitu
-z důvodů na straně nástroje, ne appky — je to potřeba napsat k výsledku,
-ne hlásit jako chybu produktu.
+### Co se v kontejneru ověřit nedá
+
+Tohle jsou omezení nástrojů, ne chyby appky. Nikdy se nesmí hlásit jako
+vada produktu — proto na ně suity padají SKIPem s důvodem, ne FAILem:
+
+- **Service workery** Playwrightí WebKit v téhle sestavě nespouští. Kdyby
+  sem přibyla offline suita, projde v Chromiu a ve WebKitu ne — z důvodu
+  na straně nástroje.
+- **Pillow v obrazu není**, takže `visual` v kontejneru snímky jen uloží
+  a neporovnává. Referenční snímky mají proto vlastní adresář
+  `baseline/chromium-container/` a s hostitelskými se nikdy nemíchají.
+- **`mouse.wheel` mobilní WebKit neumí.** Testy, které potřebují posun,
+  proto měří rozměry a `scrollTop`, ne gesto.
+- **Klávesnici nejde emulovat.** `setViewportSize()` výřez zkrátí, ale
+  prohlížeči neřekne „vyjela klávesnice", takže se nespustí odrolování na
+  zaostřené pole, které na iPhonu dělá Safari samo. Suita proto ověří jen
+  to, že si appka o mechanismus řekne
+  (`interactive-widget=resizes-content`) a že si při zkrácení výřezu sama
+  nepřeskládá obsah; zbytek patří na zařízení — `AKCEPTACE.md` krok 4.
 
 ---
 

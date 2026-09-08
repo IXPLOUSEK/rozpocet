@@ -315,7 +315,10 @@ function validateImport(obj) {
       mo.entries.forEach(function (e) {
         if (!e || typeof e !== 'object') return bad(at + ': řádek v měsíci ' + (m + 1) + ' není objekt.');
         if (!e.del) { live += 1; sum.entries += 1; }
-        if (!amt(e.plan)) bad(at + ' / měsíc ' + (m + 1) + ': plán nejsou celé haléře (' + String(e.plan) + ').');
+        // Plán smí být null — znamená to „nezadáno", ne nulu. Bez téhle
+        // výjimky by appka odmítla vlastní zálohu, jakmile v ní bude
+        // jediné vyprázdněné pole.
+        if (e.plan !== null && e.plan !== undefined && !amt(e.plan)) bad(at + ' / měsíc ' + (m + 1) + ': plán nejsou celé haléře (' + String(e.plan) + ').');
         if (e.act !== null && e.act !== undefined && !amt(e.act)) bad(at + ' / měsíc ' + (m + 1) + ': skutečnost nejsou celé haléře (' + String(e.act) + ').');
       });
       if (live) sum.months += 1;

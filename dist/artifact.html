@@ -47,6 +47,8 @@
 
   /* --- grafy a proužky ----------------------------------------------- */
   --track: #E9D6DB;          /* dráha proužku, 1.32:1 vůči surface */
+  --meter-track: #E9D6DB;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #A6818C;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
   --grid: #EADDE0;           /* mřížka v SVG */
   --bar-plan-c: #7E7276;     /* plán — neutrální, 3.32:1 na --track */
   --bar-act-c: #BE123C;      /* skutečnost, 4.52:1 na --track */
@@ -140,6 +142,8 @@
     --neg: #FF6961;  --neg-soft: #3A1D1B;
     --warn: #FF9F0A; --warn-soft: #3A2A10;
     --track: #342B2E;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
     --grid: #3A3033;
     --bar-plan-c: #9A8F92;
     --bar-act-c: #FDA4AF;
@@ -177,6 +181,8 @@
   --neg: #FF6961;  --neg-soft: #3A1D1B;
   --warn: #FF9F0A; --warn-soft: #3A2A10;
   --track: #342B2E;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
   --grid: #3A3033;
   --bar-plan-c: #9A8F92;
   --bar-act-c: #FDA4AF;
@@ -210,6 +216,8 @@
     --pos: #0B5D3E; --neg: #8C1E17; --warn: #8A4007;
     --pos-soft: #DCF5E9; --neg-soft: #FDE7E5; --warn-soft: #FEF5E6;
     --track: #E0D2D6; --grid: #C9BCC0;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
     --bar-plan-c: #6B6165; --bar-act-c: #BE123C; --bar-over-c: #8C1E17;
     --cat-1: #9F1239;  --cat-2: #E11D74;  --cat-3: #115E59;  --cat-4: #0D9488;
     --cat-5: #3730A3;  --cat-6: #2E7DD1;  --cat-7: #7C2D12;  --cat-8: #D97706;
@@ -372,6 +380,12 @@ button:active, .chip:active, .chip-month:active, .tab:active {
   .btn-danger:hover { background: var(--neg); filter: brightness(.92); }
   .cell .amt:hover { background: var(--surface-2); }
 }
+
+/* Skrytý obsah nesmí roztáhnout stránku do stran. U <table> nestačí
+   width:1px — tabulka roste podle obsahu, proto se balí do bloku a ten
+   se odsune mimo plátno. Vlevo, aby se tím nezvětšila šířka dokumentu. */
+.sr-only { left: -10000px; top: auto; }
+.chart-data-wrap > table { width: auto; }
 
 /* === 12-shell.css === */
 /* 12-shell.css — skořápka: hlavička, pás měsíců, obrazovky, tabbar, FAB
@@ -1162,6 +1176,17 @@ textarea { font-size: 16px; }
 .month-cell-val { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .month-cell.is-active .month-cell-val { color: var(--accent-ink); }
 
+/* Dráha ukazatele je světlá schválně — jenže pak není vidět, kde ukazatel
+   končí. Místo tmavé výplně (v růžovém rozhraní by křičela) dostane tenkou
+   hranici, která proti podkladu drží 3:1. */
+.goalbar,
+.minibar,
+.ybar {
+  background: var(--meter-track) !important;
+  border: 1px solid var(--meter-edge, var(--ink-3));
+  box-sizing: border-box;
+}
+
 /* === 14-charts.css === */
 /* 14-charts.css — ručně psané inline SVG a legenda — vlastní: L1
    Barvu si SVG nikdy nenese samo. Nastaví se třída (.cat-3, .chart-bar-act…),
@@ -1349,6 +1374,18 @@ svg { width: 100%; height: auto; display: block; }
   .kpi-value { font-size: 16pt; }
   .sec-title { color: var(--ink) !important; }
   a[href] { text-decoration: none; color: inherit; }
+
+  /* Na papíře se nic neuřezává třemi tečkami — místa je dost, ať se to
+     radši zalomí. Uřízlý název kategorie je v tištěném přehledu k ničemu. */
+  .chart-legend-name,
+  .row-name,
+  .tx-name,
+  .goal-name,
+  .yrow-month {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
 }
 </style>
 <div id="app">
@@ -2107,7 +2144,8 @@ function emptyDoc() {
       autofillOnPaid: true,
       syncUrl: '', syncSecret: '', lastSyncAt: null,
       lastExportAt: null,
-      installNagDismissedAt: null
+      installNagDismissedAt: null,
+      welcomeDone: false
     },
     // getMonth(), ne UTC převod — v Praze by leden spadl do prosince.
     ui: { screen: 'month', month: now.getMonth(), yearTab: 'summary', journalFilter: 'all' },
@@ -2403,7 +2441,7 @@ function validateDoc(doc) {
           if (catSeen.has(e.cat)) bad(w + ': kategorie ' + e.cat + ' má v tomhle měsíci dva řádky');
           else catSeen.add(e.cat);
         }
-        if (!amount(e.plan)) bad(w + '.plan nejsou celé haléře: ' + String(e.plan));
+        if (e.plan !== null && e.plan !== undefined && !amount(e.plan)) bad(w + '.plan nejsou celé haléře: ' + String(e.plan));
         if (e.act !== null && e.act !== undefined && !amount(e.act)) bad(w + '.act nejsou celé haléře: ' + String(e.act));
         if (!dayOk(e.due === undefined ? null : e.due)) bad(w + '.due je mimo 1..31');
         if (e.paidAt !== null && e.paidAt !== undefined && !parseYmd(e.paidAt)) bad(w + '.paidAt není datum');
@@ -2447,26 +2485,35 @@ function scheduleSave() { savePending = true; saveDebounced(); }
 // Synchronně, pro pagehide / beforeunload.
 function flushSave() { return savePending ? saveNow() : saveStatus; }
 
+// Selhání zápisu se musí dostat ven. Bez tohohle appka mlčky nic neukládá
+// a v Nastavení pořád svítí, že ukládání funguje.
+function saveReport() {
+  if (!saveStatus.ok && typeof saveProblemNotify === 'function') {
+    try { saveProblemNotify(saveStatus); } catch (e) {}
+  }
+  return saveStatus;
+}
+
 function saveNow() {
   savePending = false;
   if (!state || typeof state !== 'object') {
     saveStatus = { ok: false, reason: 'nostate', at: Date.now(), problems: [] };
-    return saveStatus;
+    return saveReport();
   }
   // Po havarijním načtení se do hlavního klíče nesahá, dokud uživatelka nerozhodne.
   if (loadBlocked) {
     saveStatus = { ok: false, reason: 'locked', at: Date.now(), problems: [] };
-    return saveStatus;
+    return saveReport();
   }
   const problems = validateDoc(state);
   if (problems.length) {
     saveStatus = { ok: false, reason: 'invalid', at: Date.now(), problems: problems.slice(0, 10) };
-    return saveStatus;
+    return saveReport();
   }
   state.savedAt = storageStamp();
   let json;
   try { json = JSON.stringify(state); }
-  catch (e) { saveStatus = { ok: false, reason: 'stringify', at: Date.now(), problems: [] }; return saveStatus; }
+  catch (e) { saveStatus = { ok: false, reason: 'stringify', at: Date.now(), problems: [] }; return saveReport(); }
 
   const prev = saveLastGood;
   let wrote = false, quota = false;
@@ -2481,7 +2528,7 @@ function saveNow() {
   if (!wrote) {
     // Data v paměti zůstávají netknutá a nic se nemaže.
     saveStatus = { ok: false, reason: quota ? 'quota' : 'write', at: Date.now(), problems: [] };
-    return saveStatus;
+    return saveReport();
   }
   // Záloha nese PŘEDCHOZÍ dobrý stav, aby jeden špatný zápis nesebral oba.
   writeBackup(prev || json);
@@ -2955,8 +3002,14 @@ function setGoal(catId, goal, y) {
 function setPlanned(m, entryId, minor, y) {
   const e = getEntry(m, entryId, y);
   if (!e) return null;
-  const v = (minor === null || minor === undefined) ? 0
-          : (Number.isSafeInteger(minor) ? Math.abs(minor) : null);
+  // Prázdné pole je "nezadáno", ne nula. Do součtů se stejně počítá jako
+  // nula, ale na obrazovce je pomlčka místo sebevědomého 0 Kč.
+  if (minor === null || minor === undefined) {
+    if (e.plan === null) return e;
+    e.plan = null;
+    return bump(e);
+  }
+  const v = Number.isSafeInteger(minor) ? Math.abs(minor) : null;
   if (v === null) return null;               // NaN ani string se do dokumentu nedostane
   if (e.plan === v) return e;
   e.plan = v;
@@ -2992,7 +3045,16 @@ function togglePaid(m, entryId, want, y) {
     e.paidAt = todayISO();
     // Doplnit smí jen do prázdného pole a musí si to označit, jinak by po
     // odškrtnutí zůstalo strašidelné číslo, které nikdo nezadal.
-    if (state.settings.autofillOnPaid && e.act === null) { e.act = e.plan; e.autoFilled = true; }
+    // A hlavně NESMÍ přepsat skutečnost dopočítanou z deníku: act === null
+    // znamená "počítej z nákupů", takže když nějaké nákupy jsou, je to
+    // reálná útrata a plán by ji přebil. Zaplaceno je stav platby, ne částka.
+    let zDeniku = 0;
+    try { zDeniku = (typeof txByCat === 'function') ? (txByCat(y || state.activeYear, m).get(e.cat) || 0) : 0; }
+    catch (err) { zDeniku = 0; }
+    if (state.settings.autofillOnPaid && e.act === null && zDeniku === 0
+        && Number.isSafeInteger(e.plan) && e.plan > 0) {
+      e.act = e.plan; e.autoFilled = true;
+    }
   } else {
     e.paidAt = null;
     if (e.autoFilled) { e.act = null; e.autoFilled = false; }
@@ -3151,7 +3213,7 @@ function setSetting(key, value) {
   let v = value;
   if (key === 'theme') { if (['auto', 'light', 'dark'].indexOf(v) < 0) return null; }
   else if (key === 'dueSoonDays') { if (!Number.isInteger(v)) return null; v = clamp(v, 0, 60); }
-  else if (key === 'autofillOnPaid') { v = v === true; }
+  else if (key === 'autofillOnPaid' || key === 'welcomeDone') { v = v === true; }
   else if (key === 'syncUrl' || key === 'syncSecret') { v = String(v === undefined || v === null ? '' : v); }
   else { if (v !== null && typeof v !== 'string') return null; }
   if (s[key] === v) return s;
@@ -3303,6 +3365,17 @@ function computeMonth(y, m) {
                           count: 0, paidCount: 0, dueCount: 0, rows: [] };
     }
 
+    // Ručně zadaná skutečnost u archivované kategorie. Řádek se nezobrazuje,
+    // ale peníze utracené byly — musí zůstat ve výdajích, jinak by smazání
+    // kategorie zvedlo zůstatek o částku, kterou uživatelka opravdu vydala.
+    let archivovaneRucne = 0;
+    _dEntries(yr, m).forEach(function (e) {
+      if (!e || e.del) return;
+      const c = cats.get(e.cat);
+      if (c && c.archived && c.sec !== 'income'
+          && Number.isSafeInteger(e.act) && e.act !== 0) archivovaneRucne += e.act;
+    });
+
     _dEntries(yr, m).forEach(function (e) {
       if (!e || e.del) return;
       const cat = cats.get(e.cat);
@@ -3359,7 +3432,8 @@ function computeMonth(y, m) {
     // Přísná rovnost přes sekce zůstává dostupná jako outflowSections
     // a balanceSections.
     const outflowSections = outflow;
-    outflow += orphanTotal;
+    const nezarazeno = orphanTotal + archivovaneRucne;
+    outflow += nezarazeno;
 
     // Nezařazené nákupy do zůstatku NEPATŘÍ: závazná rovnost zní
     //   příjmy − (fixed + daily + savings + debt + subs) === zůstatek
@@ -3392,7 +3466,7 @@ function computeMonth(y, m) {
       plannedBalance: plannedIncome - plannedOutflow,
       daysLeft: daysLeft,
       leftPerDay: daysLeft > 0 ? Math.trunc(balance / daysLeft) : null,
-      orphans: { count: orph.length, total: orphanTotal },
+      orphans: { count: orph.length, total: nezarazeno, txTotal: orphanTotal, manualTotal: archivovaneRucne },
       balanceWithOrphans: balance,
       note: (yr && yr.months[m] && typeof yr.months[m].note === 'string') ? yr.months[m].note : ''
     };
@@ -3689,7 +3763,11 @@ function chartSvgRoot(w, h, title, desc, cls) {
 
 // Skrytá tabulka se stejnými čísly — odečítátko dostane data, ne obrázek.
 function chartTable(caption, cols, rows) {
-  const t = el('table', { class: 'sr-only chart-data' }), thead = el('thead'), head = el('tr');
+  // Tabulka se BALÍ do skrytého bloku. Samotná <table> se totiž chová jako
+  // tabulka i se width:1px — roste podle obsahu a stránka pak přetéká do
+  // stran. Blok kolem ní je oříznutelný, tabulka uvnitř zůstane tabulkou.
+  const wrap = el('div', { class: 'sr-only chart-data-wrap' });
+  const t = el('table', { class: 'chart-data' }), thead = el('thead'), head = el('tr');
   t.appendChild(el('caption', null, caption));
   cols.forEach(function (c) { head.appendChild(el('th', { scope: 'col' }, c)); });
   thead.appendChild(head); t.appendChild(thead);
@@ -3700,7 +3778,8 @@ function chartTable(caption, cols, rows) {
     tb.appendChild(tr);
   });
   t.appendChild(tb);
-  return t;
+  wrap.appendChild(t);
+  return wrap;
 }
 
 // viewBox se přepočítává ze skutečné šířky hostitele — jinak by se s obrázkem
@@ -4101,10 +4180,19 @@ function onFocusIn(e) {
   const input = e.target.closest && e.target.closest('input.amt');
   if (!input) return;
   input.classList.remove('is-invalid');
-  // Vybrat obsah, aby se dal rovnou přepsat. Přes rAF kvůli iOS.
-  if (input.value) requestAnimationFrame(function () {
-    try { input.setSelectionRange(0, input.value.length); } catch (_) {}
-  });
+  // Označit obsah, aby se dal rovnou přepsat. Nejdřív hned — Safari na iOS
+  // to při klepnutí občas přebije, proto ještě jednou v dalším snímku, ALE
+  // jen když se hodnota mezitím nezměnila. Bez té podmínky se označí právě
+  // napsaná číslice a další stisk ji přepíše: z „1500" bylo „500".
+  const puvodni = input.value;
+  if (puvodni) {
+    try { input.setSelectionRange(0, puvodni.length); } catch (_) {}
+    requestAnimationFrame(function () {
+      if (document.activeElement !== input) return;
+      if (input.value !== puvodni) return;          // už píše, nesahat
+      try { input.setSelectionRange(0, input.value.length); } catch (_) {}
+    });
+  }
 }
 
 function onInput(e) {
@@ -4545,7 +4633,7 @@ function sheetBannerClear(id) {
 // v soukromém scope uvnitř IIFE, aby do sdíleného scope nic neuniklo.
 
 let renderMonthScreen, renderSectionCard, renderRow;
-let patchMonth, patchRow, patchTotals, patchAlertCard;
+let patchMonth, patchRow, patchTotals, patchAlertCard, patchOrphanCard;
 const rowIndex = new Map();   // id POLOŽKY -> uzel .row
 
 (function () {
@@ -4638,6 +4726,15 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
 
     // 2) Upozornění na splatnosti. Obsah i schování řeší patchAlertCard().
     frag.appendChild(tpl('tpl-alert-card'));
+
+    // 2b) Nezařazené nákupy. Peníze, které se počítají do výdajů, ale nemají
+    //     v tomhle měsíci řádek — musí být vidět tady, ne jen v deníku.
+    const orph = tpl('tpl-alert-card');
+    orph.dataset.kind = 'orphan';
+    orph.dataset.act = 'nav';
+    orph.dataset.screen = 'journal';
+    orph.hidden = true;
+    frag.appendChild(orph);
 
     // 3) Šest sekcí v pořadí ze SECTIONS.
     for (const s of SECTIONS) frag.appendChild(renderSectionCard(s, sec(data, s.key).rows));
@@ -4785,10 +4882,10 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
 
     // Hrdina: znaménko slovy i barvou. Nápověda jen v běžícím měsíci —
     // „na den do konce měsíce" u dubna v září nedává smysl.
-    // Poškozený zůstatek se NEPŘEVÁDÍ na nulu — formatCzk z něj udělá pomlčku.
-  // Zelená nula by tvrdila, že je všechno v pořádku, i když není.
-  const balOk = Number.isSafeInteger(data.balance);
-  const bal = balOk ? data.balance : NaN;
+    // Poškozený zůstatek se NEPŘEVÁDÍ na nulu — formatCzk z něj udělá
+    // pomlčku. Zelená nula by tvrdila, že je všechno v pořádku, i když není.
+    const balOk = Number.isSafeInteger(data.balance);
+    const bal = balOk ? data.balance : NaN;
     let hint = '';
     if (isCurrentMonth(y, m) && Number.isSafeInteger(data.leftPerDay)) {
       hint = formatCzk(data.leftPerDay) + ' ' + TXT.kpiLeftHint;
@@ -4801,6 +4898,7 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
     }
 
     patchAlertCard();
+    patchOrphanCard(data);
     patchTotals();
 
     // Řádky se hledají v rowIndexu, ne v DOMu.
@@ -4842,6 +4940,21 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
       setBarWidth(bar, pct(act, peak) || 0);
       bar.classList.toggle('is-over', s.dir < 0 && act > plan);
     }
+  };
+
+  patchOrphanCard = function patchOrphanCard(data) {
+    const node = qs('#screen-month [data-kind="orphan"]');
+    if (!node) return;
+    const total = (data && data.orphans && Number.isSafeInteger(data.orphans.total)) ? data.orphans.total : 0;
+    const pocet = (data && data.orphans && data.orphans.count) | 0;
+    if (!total) { node.hidden = true; return; }
+    node.hidden = false;
+    setText(node.querySelector('[data-d="title"]'), 'Nezařazené výdaje: ' + formatCzk(total));
+    setText(node.querySelector('[data-d="sub"]'),
+      pocet ? (pocet === 1 ? '1 nákup nemá v tomhle měsíci svůj řádek'
+                           : pocet + ' nákupů nemá v tomhle měsíci svůj řádek')
+            : 'Částka u smazané kategorie');
+    node.classList.add('is-warn');
   };
 
   patchAlertCard = function patchAlertCard() {
@@ -6372,12 +6485,18 @@ function exportJSON() {
 }
 
 // Cesta k prvnímu neplatnému číslu v dokumentu, jinak null.
-exportJSON.nonFinite = function (v, path) {
+// Hlídané klíče musí být celé haléře. Řetězec "100" se do součtu dostane
+// jako text a v prohlížeči se z něj tiše stane spojování, ne sčítání.
+exportJSON.AMOUNT_KEYS = { plan: 1, act: 1, amt: 1, target: 1, startBalance: 1 };
+
+exportJSON.nonFinite = function (v, path, key) {
   if (typeof v === 'number') return Number.isFinite(v) ? null : path;
+  if (v !== null && v !== undefined && key && exportJSON.AMOUNT_KEYS[key]
+      && typeof v !== 'number') return path;
   if (!v || typeof v !== 'object') return null;
   const arr = Array.isArray(v);
   for (const k in v) {
-    const r = exportJSON.nonFinite(v[k], path + (arr ? '[' + k + ']' : '.' + k));
+    const r = exportJSON.nonFinite(v[k], path + (arr ? '[' + k + ']' : '.' + k), arr ? key : k);
     if (r) return r;
   }
   return null;
@@ -6621,7 +6740,32 @@ applyImport.plural = function (n, one, few, many) {
 
 /* ======================= tisk ======================= */
 
-function renderPrintView(y, m) {
+// Tisk celého roku: dvanáct měsíčních sestav za sebou. Uživatel chtěl mít
+// rok pohromadě, takže ho musí jít pohromadě i vytisknout.
+function renderPrintYear(y) {
+  const host = qs('#screen-print');
+  if (!host) return null;
+  const all = document.createDocumentFragment();
+  for (let m = 0; m < 12; m++) {
+    renderPrintView(y, m, true);
+    const kids = Array.prototype.slice.call(host.childNodes);
+    for (const n of kids) {
+      // Nápovědu i patičku bere jen první měsíc, ať se to neopakuje 12×.
+      if (m > 0 && n.classList && (n.classList.contains('print-hint') || n.classList.contains('pv-sub'))) continue;
+      all.appendChild(n);
+    }
+    if (m < 11) {
+      const br = el('div', { class: 'pv-break' });
+      br.style.breakAfter = 'page';
+      br.style.pageBreakAfter = 'always';
+      all.appendChild(br);
+    }
+  }
+  host.replaceChildren(all);
+  return host;
+}
+
+function renderPrintView(y, m, keepTitle) {
   const host = qs('#screen-print');
   if (!host) return null;
   const frag = document.createDocumentFragment();
@@ -6633,7 +6777,7 @@ function renderPrintView(y, m) {
   hint.appendChild(el('span', null, 'Pro PDF klepni na Sdílet → Tisk'));
   hint.appendChild(el('button', { class: 'btn btn-primary', type: 'button', 'data-act': 'io.printClose' }, TXT.close));
   frag.appendChild(hint);
-  frag.appendChild(el('h1', { class: 'pv-title' }, monthLabelCs(y, m)));   // nominativ
+  frag.appendChild(el('h1', { class: 'pv-title' }, monthLabelCs(y, m) + (keepTitle ? '' : '')));   // nominativ
   frag.appendChild(el('p', { class: 'pv-sub' }, TXT.appName + ' · vytištěno ' + fmtDateLong(todayISO())));
 
   const yr = state.years[String(y)];
@@ -6673,10 +6817,18 @@ function renderPrintView(y, m) {
   // KPI se počítají ze sekcí, proto se skládají až teď — ale patří nad ně.
   let op = 0, oa = 0;
   SECTIONS.forEach(function (s) { if (s.dir < 0) { op += sums[s.key].plan; oa += sums[s.key].act; } });
+  // Nezařazené výdaje musí být i na papíře, jinak by tištěný zůstatek
+  // nesouhlasil s tím, co appka ukazuje na obrazovce.
+  let nezarazeno = 0;
+  try { const md = computeMonth(y, m); nezarazeno = (md.orphans && md.orphans.total) | 0; } catch (e) { nezarazeno = 0; }
+  oa += nezarazeno;
   const kpi = renderPrintView.table(['', TXT.colPlan, TXT.colActual]);
   const kb = el('tbody');
   kb.appendChild(renderPrintView.row('td', [TXT.kpiIncome, formatCzk(sums.income.plan), formatCzk(sums.income.act)]));
   kb.appendChild(renderPrintView.row('td', [TXT.kpiExpense, formatCzk(op), formatCzk(oa)]));
+  if (nezarazeno) {
+    kb.appendChild(renderPrintView.row('td', ['z toho nezařazené nákupy', '', formatCzk(nezarazeno)]));
+  }
   kb.appendChild(renderPrintView.row('th', [TXT.kpiLeft, formatCzk(sums.income.plan - op), formatCzk(sums.income.act - oa)]));
   kpi.appendChild(kb);
   frag.appendChild(kpi);
@@ -6746,6 +6898,12 @@ renderPrintView.row = function (tag, cells) {
 // neudělá nic, je nad přehledem ještě ruční návod.
 function printMonth(y, m) {
   renderPrintView(y, m);
+  printMonth.overlay(true);
+  try { window.print(); } catch (e) {}
+}
+
+function printYear(y) {
+  renderPrintYear(y);
   printMonth.overlay(true);
   try { window.print(); } catch (e) {}
 }
@@ -6842,6 +7000,7 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
     'io.export': function () { exportJSON(); },
     'io.exportCsv': function () { exportCSVMonth(state.activeYear, state.ui.month); },
     'io.print': function () { printMonth(state.activeYear, state.ui.month); },
+    'io.printYear': function () { printYear(state.activeYear); },
     'io.printClose': function () { printMonth.overlay(false); },
 
     // Výběr souboru musí odstartovat uvnitř klepnutí, jinak se dialog
@@ -7233,6 +7392,7 @@ function renderSettingsScreen() {
   btn(bb, TXT.restore, 'io.import');
   btn(bb, TXT.exportCsv, 'io.exportCsv');
   btn(bb, TXT.print, 'io.print');
+  btn(bb, 'Tisk celého roku', 'io.printYear');
 
   /* --- 3. Vzhled --- */
   const look = card('Vzhled');
@@ -7361,14 +7521,24 @@ function patchSettings() {
     // Zamčené ukládání je vlastní stav. Napsat "funguje" jen proto, že
     // úložiště existuje, by byla lež v tom nejhorším možném okamžiku.
     const zamceno = !!(s && s.locked);
+    // Stav posledního zápisu, ne jen to, jestli úložiště existuje.
+    const zapis = (typeof saveStatus === 'object' && saveStatus) ? saveStatus : { ok: true, reason: 'idle' };
+    const potize = {
+      quota: 'Došlo místo — poslední změny se neuložily. Stáhni si zálohu.',
+      write: 'Poslední zápis selhal. Stáhni si zálohu.',
+      invalid: 'V datech je chyba, poslední změny se neuložily. Stáhni si zálohu.',
+      stringify: 'Data se nepodařilo uložit. Stáhni si zálohu.',
+      nostate: 'Aplikace nemá data.',
+    };
     setText(st, !s || !s.ok
       ? 'Ukládání nefunguje — data se neuloží.'
       : (zamceno
         ? 'Ukládání je pozastavené, protože poškozená data leží stranou. Načti zálohu, nebo data vymaž.'
-        : 'Ukládání funguje.'));
+        : (!zapis.ok && potize[zapis.reason] ? potize[zapis.reason] : 'Ukládání funguje.')));
     if (st) {
-      st.classList.toggle('is-neg', !s || !s.ok || zamceno);
-      st.classList.toggle('is-pos', !!(s && s.ok && !zamceno));
+      const spatne = !s || !s.ok || zamceno || !zapis.ok;
+      st.classList.toggle('is-neg', spatne);
+      st.classList.toggle('is-pos', !spatne);
     }
     st.classList.toggle('is-neg', !(s && s.ok));
   }
@@ -7488,8 +7658,14 @@ function patchSettings() {
         okLabel: 'Načíst', danger: true,
       }).then(function (ok) {
         if (!ok) return;
-        if (hasData && typeof exportJSON === 'function') {
-          try { exportJSON(); } catch (e) { console.warn('záloha před ukázkou selhala', e); }
+        // Snímek v úložišti je jistota, kterou stažený soubor nikdy nedá:
+        // prohlížeč nepotvrdí, že se záloha uložila, a na iPhonu se sdílení
+        // dá zrušit. Bez tohohle by jedno klepnutí smazalo rok práce.
+        if (hasData) {
+          try { snapshotSave('pred-ukazkou', state); } catch (e) {}
+          if (typeof exportJSON === 'function') {
+            try { exportJSON(); } catch (e) { console.warn('záloha před ukázkou selhala', e); }
+          }
         }
         const keep = storageClone(state.settings);   // motiv a synchronizace zůstávají
         const fresh = emptyDoc();
@@ -7509,8 +7685,12 @@ function patchSettings() {
         // Trvalý pruh bez křížku. Skutečné riziko není, že si je načte,
         // ale že si je splete s vlastními čísly.
         const b = sheetBanner({ id: 'demo', kind: 'warn', icon: '🧪',
-          title: TXT.demoBanner, body: 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
-          action: TXT.demoWipe, act: 'demo.wipe' });
+          title: TXT.demoBanner,
+          body: hasData
+            ? 'Tvoje původní data jsou uložená stranou — vrátíš je tlačítkem Vrátit moje data.'
+            : 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
+          action: hasData ? 'Vrátit moje data' : TXT.demoWipe,
+          act: hasData ? 'demo.undo' : 'demo.wipe' });
         if (b) b.classList.add('is-warn');
         saveNow();   // ne flushSave: po přímé změně stavu není co „flushnout"
         renderApp();
@@ -7535,6 +7715,26 @@ function patchSettings() {
         renderApp();
         toast('Hotovo, aplikace je prázdná.');
       });
+    },
+
+    // Návrat z ukázkových dat na to, co tu bylo předtím.
+    'demo.undo': function () {
+      const snaps = (typeof snapshotList === 'function') ? snapshotList() : [];
+      const snap = snaps.filter(function (x) { return x && x.ok; })
+        .find(function (x) { return x.reason === 'pred-ukazkou'; });
+      if (!snap || typeof snapshotRestore !== 'function') {
+        toast('Snímek se nepodařilo najít. Načti zálohu ze souboru.');
+        return;
+      }
+      const r = snapshotRestore(snap.key);
+      if (r && r.ok) {
+        sheetBannerClear('demo');
+        invalidateAll();
+        renderApp();
+        toast('Tvoje data jsou zpátky.');
+      } else {
+        toast('Vrátit se to nepodařilo. Načti zálohu ze souboru.');
+      }
     },
 
     'more.selftest': function () {
@@ -8404,6 +8604,50 @@ function selfTest() {
     } else assertSkip('kontrola osiřelých nákupů', 'není implementováno');
   } else assertSkip('výpočty nad daty', 'model ještě není načtený');
 
+  /* --- chyby, které tu už jednou byly --- */
+  if (typeof computeMonth === 'function' && typeof addCatalogItem === 'function') {
+    // Pískoviště: vlastní rok, ať se nesahá na skutečná data.
+    const zk = 1900;
+    try {
+      state.years[String(zk)] = newYear(zk);
+      const puvodniRok = state.activeYear;
+      state.activeYear = zk;
+      const M = 0;
+      const kPrijem = addCatalogItem({ sec: 'income', name: 'Zkouška příjem' }, 'all', zk);
+      const kFix = addCatalogItem({ sec: 'fixed', name: 'Zkouška fixní' }, 'all', zk);
+      const kDen = addCatalogItem({ sec: 'daily', name: 'Zkouška denní' }, 'all', zk);
+      setActual(M, ensureEntry(M, kPrijem.id, zk).id, 3000000, zk);
+      const eFix = ensureEntry(M, kFix.id, zk);
+      setPlanned(M, eFix.id, 1000000, zk); setActual(M, eFix.id, 1000000, zk);
+      const eDen = ensureEntry(M, kDen.id, zk);
+      setPlanned(M, eDen.id, 500000, zk);
+      addTx({ d: zk + '-01-05', m: M, cat: kDen.id, amt: 300000 }, zk);
+
+      let md = computeMonth(zk, M);
+      assertEq('tři čísla na obrazovce sedí', md.incomeTotal - md.outflow, md.balance);
+
+      // Zaplaceno nesmí přepsat skutečnost dopočítanou z deníku.
+      togglePaid(M, eDen.id, true, zk);
+      assertEq('zaplaceno nepřepíše deník', getEntry(M, eDen.id, zk).act, null);
+
+      // Smazání kategorie s ručně zadanou skutečností nesmí zvednout zůstatek.
+      const pred = computeMonth(zk, M).balance;
+      archiveCatalogItem(kFix.id, zk);
+      assertEq('smazaná kategorie peníze neschová', computeMonth(zk, M).balance, pred);
+
+      // Prázdný plán je „nezadáno", ne nula.
+      setPlanned(M, eDen.id, null, zk);
+      assertEq('prázdný plán je null', getEntry(M, eDen.id, zk).plan, null);
+
+      state.activeYear = puvodniRok;
+      delete state.years[String(zk)];
+      invalidateAll();
+    } catch (e) {
+      assertSkip('kontrola dřívějších chyb', String(e));
+      try { delete state.years[String(1900)]; invalidateAll(); } catch (e2) {}
+    }
+  } else assertSkip('kontrola dřívějších chyb', 'model není načtený');
+
   /* --- grafy --- */
   if (typeof polar === 'function') {
     const p0 = polar(50, 50, 40, 0), p90 = polar(50, 50, 40, 90);
@@ -8419,7 +8663,15 @@ function selfTest() {
   assertEq('nikde input[type=number]', document.querySelectorAll('input[type="number"]').length, 0);
   assertEq('jazyk stránky', document.documentElement.lang, 'cs');
   const badWords = /\b(NaN|Infinity|\[object Object\])\b/;
-  assertTrue('nikde NaN ani [object Object] v textu', !badWords.test(document.body.innerText || ''));
+  // Panel s výsledky obsahuje názvy vlastních testů, ve kterých slovo NaN
+  // stojí schválně. Bez jeho vynechání by druhé spuštění hlásilo falešnou
+  // chybu — kontrola musí být opakovatelná.
+  const oldPanel = qs('#selftest');
+  const puvodniZobrazeni = oldPanel ? oldPanel.style.display : null;
+  if (oldPanel) oldPanel.style.display = 'none';
+  const textStranky = document.body.innerText || '';
+  if (oldPanel) oldPanel.style.display = puvodniZobrazeni || '';
+  assertTrue('nikde NaN ani [object Object] v textu', !badWords.test(textStranky));
   const smallInputs = qsa('input, select, textarea').filter(function (i) {
     const fs = parseFloat(getComputedStyle(i).fontSize);
     return Number.isFinite(fs) && fs < 16;
@@ -8584,6 +8836,26 @@ function maybeBackupNag() {
     body: 'Prohlížeč umí data smazat sám. Stažený soubor je jediná kopie, kterou máš plně pod kontrolou.',
     action: TXT.backup, act: 'io.export',
   });
+}
+
+// Hlásí, že se přestalo ukládat. Pruh je trvalý a nedá se odklepnout —
+// je to nejdůležitější informace, jakou appka může mít.
+let _saveNagAt = 0;
+function saveProblemNotify(st) {
+  const teksty = {
+    quota: ['Došlo místo', 'Prohlížeč odmítl uložit další data. Stáhni si zálohu, ať o nic nepřijdeš, a smaž staré měsíce nebo ukázková data.'],
+    write: ['Data se neukládají', 'Zápis do prohlížeče selhal. Stáhni si zálohu a zkus aplikaci zavřít a otevřít znovu.'],
+    locked: ['Ukládání je pozastavené', 'Poškozená data leží stranou. Načti zálohu, nebo data vymaž — teprve pak se zase ukládá.'],
+    invalid: ['V datech je chyba', 'Něco v datech neodpovídá očekávanému tvaru, tak se radši neuložila. Stáhni si zálohu.'],
+    stringify: ['Data nejdou uložit', 'Nepodařilo se z nich udělat zápis. Stáhni si zálohu.'],
+    nostate: ['Aplikace nemá data', 'Zkus ji zavřít a otevřít znovu.'],
+  };
+  const t = teksty[st && st.reason] || ['Data se neukládají', 'Stáhni si zálohu, ať o nic nepřijdeš.'];
+  sheetBannerClear('save');
+  sheetBanner({ id: 'save', kind: 'error', icon: '⚠️', title: t[0], body: t[1],
+    action: TXT.backup, act: 'io.export' });
+  const now = Date.now();
+  if (now - _saveNagAt > 20000) { _saveNagAt = now; toast(t[0] + ' — stáhni si zálohu.', { ms: 8000 }); }
 }
 
 function registerSW() {
