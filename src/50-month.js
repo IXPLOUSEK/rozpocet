@@ -315,7 +315,8 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
       setBarWidth(card.querySelector('[data-d="barplan"]'), pct(plan, peak) || 0);
       const bar = card.querySelector('[data-d="baract"]');
       setBarWidth(bar, pct(act, peak) || 0);
-      bar.classList.toggle('is-over', s.dir < 0 && act > plan);
+      // Bez zadaného plánu není co přečerpat — červený pruh by lhal.
+      bar.classList.toggle('is-over', s.dir < 0 && plan > 0 && act > plan);
     }
   };
 

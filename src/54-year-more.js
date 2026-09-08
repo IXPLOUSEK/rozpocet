@@ -490,6 +490,12 @@ function patchSettings() {
       stringify: 'Data se nepodařilo uložit. Stáhni si zálohu.',
       nostate: 'Aplikace nemá data.',
     };
+    // Úspěch po úklidu místa není chyba, ale ani mlčení — místo dochází.
+    if (zapis.ok && zapis.reason === 'ok-po-uklidu') {
+      setText(st, 'Ukládání funguje, ale místa je málo — musela jsem uklidit staré kopie. Stáhni si zálohu.');
+      if (st) { st.classList.remove('is-pos'); st.classList.add('is-warn'); }
+      return;
+    }
     setText(st, !s || !s.ok
       ? 'Ukládání nefunguje — data se neuloží.'
       : (zamceno
@@ -499,6 +505,7 @@ function patchSettings() {
       const spatne = !s || !s.ok || zamceno || !zapis.ok;
       st.classList.toggle('is-neg', spatne);
       st.classList.toggle('is-pos', !spatne);
+      st.dataset.stav = spatne ? 'spatne' : 'dobre';
     }
     st.classList.toggle('is-neg', !(s && s.ok));
   }
@@ -640,6 +647,7 @@ function patchSettings() {
         // Přes referenci schválně: statická brána počítá výskyty názvu
         // s závorkou a jeden už spotřebovala samotná deklarace funkce.
         const seedDemo = makeDemoData;
+        if (typeof invalidateAll === 'function') invalidateAll();
         seedDemo(20260908);
 
         // Trvalý pruh bez křížku. Skutečné riziko není, že si je načte,

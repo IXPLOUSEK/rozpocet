@@ -1,6 +1,10 @@
 // 31-util.js — parser částek, formátování, datumy, DOM pomocníci — vlastní: L0
 // POZOR: tenhle soubor je smlouva pro všechny ostatní. Neměnit bez testu.
 
+// Pozastavení zápisu. Vlastní kontrola si na chvíli sahá do stavu a po tu
+// dobu se nesmí nic uložit — debounce umí vystřelit i synchronně.
+let saveSuspended = false;
+
 /* ---------- identita ---------- */
 let _uidN = 0;
 function uid(prefix) {
@@ -115,7 +119,13 @@ function _group(digits) {
 // a na iOS bychom to nezjistili. Intl se používá jen jako orákulum v testech.
 function formatCzk(minor, opts) {
   const o = opts || {};
-  const decimals = o.decimals === 2 ? 2 : 0;
+  // Výchozí chování: haléře se ukazují jen tehdy, když nějaké jsou. Bez toho
+  // se řádky zaokrouhlují na koruny, ale součet ne, a tabulka pak vizuálně
+  // nedává dohromady to, co je pod ní napsané.
+  let decimals;
+  if (o.decimals === 2) decimals = 2;
+  else if (o.decimals === 0) decimals = 0;
+  else decimals = (Number.isFinite(minor) && Math.abs(minor) % 100 !== 0) ? 2 : 0;
   if (minor === null || minor === undefined || !Number.isFinite(minor)) return '—';
   const neg = minor < 0;
   let a = Math.abs(minor);

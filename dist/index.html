@@ -1797,6 +1797,10 @@ const TXT = Object.freeze({
 // 31-util.js — parser částek, formátování, datumy, DOM pomocníci — vlastní: L0
 // POZOR: tenhle soubor je smlouva pro všechny ostatní. Neměnit bez testu.
 
+// Pozastavení zápisu. Vlastní kontrola si na chvíli sahá do stavu a po tu
+// dobu se nesmí nic uložit — debounce umí vystřelit i synchronně.
+let saveSuspended = false;
+
 /* ---------- identita ---------- */
 let _uidN = 0;
 function uid(prefix) {
@@ -1911,7 +1915,13 @@ function _group(digits) {
 // a na iOS bychom to nezjistili. Intl se používá jen jako orákulum v testech.
 function formatCzk(minor, opts) {
   const o = opts || {};
-  const decimals = o.decimals === 2 ? 2 : 0;
+  // Výchozí chování: haléře se ukazují jen tehdy, když nějaké jsou. Bez toho
+  // se řádky zaokrouhlují na koruny, ale součet ne, a tabulka pak vizuálně
+  // nedává dohromady to, co je pod ní napsané.
+  let decimals;
+  if (o.decimals === 2) decimals = 2;
+  else if (o.decimals === 0) decimals = 0;
+  else decimals = (Number.isFinite(minor) && Math.abs(minor) % 100 !== 0) ? 2 : 0;
   if (minor === null || minor === undefined || !Number.isFinite(minor)) return '—';
   const neg = minor < 0;
   let a = Math.abs(minor);
@@ -2213,9 +2223,13 @@ function storageProbe() {
 }
 
 function storageGet(key) {
-  if (storageOk) {
-    const ls = storageRaw();
-    if (ls) { try { const v = ls.getItem(key); if (v !== null && v !== undefined) return v; } catch (e) { /* níž */ } }
+  // Čte se VŽDYCKY, i když zkouška zápisu selhala. Plný telefon nebo
+  // zamčené úložiště brání psaní, ne čtení — a kdyby se tu na disk nesáhlo,
+  // appka by naběhla prázdná, zatímco její data by ležela pár bajtů vedle.
+  const ls = storageRaw();
+  if (ls) {
+    try { const v = ls.getItem(key); if (v !== null && v !== undefined) return v; }
+    catch (e) { /* níž z paměti */ }
   }
   const v = storageMem.get(key);
   return v === undefined ? null : v;
@@ -2502,7 +2516,11 @@ const saveDebounced = debounce(function () { if (savePending) saveNow(); }, 400,
 function scheduleSave() { savePending = true; saveDebounced(); }
 
 // Synchronně, pro pagehide / beforeunload.
-function flushSave() { return savePending ? saveNow() : saveStatus; }
+function flushSave() {
+  // I když savePending zůstal viset po chybě, tohle je poslední pokus.
+  if (savePending || !saveStatus.ok) return saveNow();
+  return saveStatus;
+}
 
 // Selhání zápisu se musí dostat ven. Bez tohohle appka mlčky nic neukládá
 // a v Nastavení pořád svítí, že ukládání funguje.
@@ -2514,7 +2532,9 @@ function saveReport() {
 }
 
 function saveNow() {
-  savePending = false;
+  // savePending se NESHAZUJE tady. Kdyby ano, po neúspěšném zápisu by
+  // debounce ani flushSave() na pagehide už nic nezkusily — právě ve chvíli,
+  // kdy je to poslední šance.
   if (!state || typeof state !== 'object') {
     saveStatus = { ok: false, reason: 'nostate', at: Date.now(), problems: [] };
     return saveReport();
@@ -2523,6 +2543,12 @@ function saveNow() {
   if (loadBlocked) {
     saveStatus = { ok: false, reason: 'locked', at: Date.now(), problems: [] };
     return saveReport();
+  }
+  // Vlastní kontrola si na chvíli sahá do stavu. Po tu dobu se na disk
+  // nesmí sáhnout, jinak by tam zůstal její pískovištní rok.
+  if (typeof saveSuspended !== 'undefined' && saveSuspended) {
+    saveStatus = { ok: true, reason: 'pozastaveno', at: Date.now(), problems: [] };
+    return saveStatus;
   }
   const problems = validateDoc(state);
   if (problems.length) {
@@ -2540,7 +2566,10 @@ function saveNow() {
   catch (e) {
     if (saveIsQuota(e)) {
       quota = true;
-      snapshotPrune(2);                    // nejstarší snapshoty ven a jeden pokus navíc
+      // Uvolnit se má nejdřív karanténa, snímky až v krajní nouzi — jsou
+      // to jediné cesty zpátky. Dřív se z osmi nechaly dva.
+      try { quarantinePrune(1); } catch (e2) {}
+      try { storageSet(STORE_KEY, json); wrote = true; } catch (e3) { snapshotPrune(5); }
       try { storageSet(STORE_KEY, json); wrote = true; } catch (e2) { wrote = false; }
     }
   }
@@ -2552,7 +2581,10 @@ function saveNow() {
   // Záloha nese PŘEDCHOZÍ dobrý stav, aby jeden špatný zápis nesebral oba.
   writeBackup(prev || json);
   saveLastGood = json;
+  savePending = false;                 // teprve teď je opravdu uloženo
   saveStatus = { ok: true, reason: quota ? 'ok-po-uklidu' : 'ok', at: Date.now(), problems: [] };
+  // Povedlo se — pruh o chybě musí zmizet, jinak by strašil i po nápravě.
+  if (typeof saveRecovered === 'function') { try { saveRecovered(quota); } catch (e) {} }
   return saveStatus;
 }
 
@@ -2578,6 +2610,15 @@ function quarantineWrite(raw) {
       return key;
     } catch (e2) { return null; }
   }
+}
+
+// Ubere staré odložené kopie, nejnovější nechá být.
+function quarantinePrune(keep) {
+  const k = Number.isInteger(keep) && keep >= 0 ? keep : 1;
+  const list = quarantineList();
+  let removed = 0;
+  for (let i = k; i < list.length; i++) { storageRemove(list[i].key); removed += 1; }
+  return removed;
 }
 
 function quarantineList() {
@@ -2610,7 +2651,9 @@ function snapshotSave(reason, payload) {
   catch (e) {
     // Došlo místo. Uvolní se poškozené odložené kopie, ne snímky — ty jsou
     // často jediná cesta zpátky. Teprve když to nestačí, ubere se i ze snímků.
-    try { storageKeys(QUAR_PREFIX).forEach(function (k) { storageRemove(k); }); } catch (e2) {}
+    // Nejnovější odložená kopie zůstává vždycky — je to jediný zbytek
+    // původních bajtů. Uvolňují se jen ty starší.
+    try { quarantinePrune(1); } catch (e2) {}
     try { storageSet(key, json); }
     catch (e3) {
       snapshotPrune(3);
@@ -2750,6 +2793,10 @@ function loadState() {
 
   // Novější dokument z jiného zařízení: neodmigrujeme ho dozadu a ani na něj nesáhneme.
   if (first.reason === 'newer') {
+    // Dokument z novější verze je pořád platná data. Musí se odložit stranou
+    // stejně jako poškozený, jinak ho import zálohy nebo vymazání přepíše
+    // a všechno, co novější zařízení stihlo zapsat, je pryč.
+    rep.quarantineKey = quarantineWrite(String(raw));
     state = emptyDoc();
     loadBlocked = true;
     rep.ok = false; rep.source = 'newer'; rep.reason = 'newer'; rep.locked = true;
@@ -2876,7 +2923,9 @@ function ensureEntry(m, catId, y) {
   const cat = getCat(catId, y);
   if (!cat) return null;
   const e = {
-    id: uid('e_'), cat: catId, plan: 0, act: null,
+    // plan: null = nezadáno. Nula by na obrazovce tvrdila, že plán je
+    // nula korun, což není totéž jako „ještě jsem nic neplánovala".
+    id: uid('e_'), cat: catId, plan: null, act: null,
     paid: false, paidAt: null, due: null,
     autoFilled: false, del: false, updatedAt: storageStamp()
   };
@@ -3091,6 +3140,20 @@ function setEntryDue(m, entryId, day, y) {
   return bump(e);
 }
 
+// Má ten řádek v daném měsíci co ztratit? Stejné pravidlo jako v
+// 34-derived.js, jen bez závislosti na odvozené vrstvě.
+function _mMaData(m, e, y) {
+  if (Number.isSafeInteger(e.plan) && e.plan !== 0) return true;
+  if (Number.isSafeInteger(e.act) && e.act !== 0) return true;
+  if (e.paid) return true;
+  const yr = getYear(y);
+  for (let i = 0; i < yr.tx.length; i++) {
+    const t = yr.tx[i];
+    if (t && !t.del && t.m === m && t.cat === e.cat) return true;
+  }
+  return false;
+}
+
 // Měkce, nikdy splice. scope: 'this' | 'rest' | 'all'.
 function removeEntry(m, entryId, scope, y) {
   const e0 = getEntry(m, entryId, y);
@@ -3114,6 +3177,12 @@ function removeEntry(m, entryId, scope, y) {
       if (!e) continue;
       created.push({ mo: mo, e: e });
     } else if (e.del) {
+      continue;
+    } else if (i !== base && _mMaData(i, e, y)) {
+      // Měsíc, ve kterém už něco je, se NEPŘEPISUJE. „Smazat od teď dál"
+      // nebo „v celém roce" znamená přestat to sledovat, ne přepsat leden,
+      // který je hotová historie. Ten měsíc, který uživatelka smaže přímo,
+      // se smaže vždycky — to je vědomé rozhodnutí a jde vzít zpět.
       continue;
     } else {
       hidden.push(e);
@@ -3260,11 +3329,16 @@ invalidateAll.all = [txByCat, computeMonth, computeYear, computeGoals,
 
 function invalidate(y, m) {
   if (y === undefined) return invalidateAll();
-  const needle = (m === undefined) ? String(y) + ':' : String(y) + ':' + String(m) + ':';
+  // Klíč měsíčních memo je "rok:měsíc" BEZ koncové dvojtečky. S ní se
+  // neshodovalo nic a funkce tiše nemazala vůbec nic.
+  const needle = (m === undefined) ? String(y) + ':' : String(y) + ':' + String(m);
   const exact = String(y);           // computeYear a savingsSlices klíčují jen rokem
   invalidateAll.all.forEach(function (fn) {
     Array.from(fn.memo.keys()).forEach(function (k) {
-      if (k.indexOf(needle) === 0 || k === exact) fn.memo.delete(k);
+      // U konkrétního měsíce se porovnává celý klíč, aby "2026:1"
+      // neshodilo taky "2026:10", "2026:11" a "2026:12".
+      const sedi = (m === undefined) ? (k.indexOf(needle) === 0) : (k === needle);
+      if (sedi || k === exact) fn.memo.delete(k);
     });
   });
 }
@@ -3302,6 +3376,20 @@ function _dEntries(yr, m) {
 /* ---------- deník po kategoriích ---------- */
 
 // Živý řádek = nesmazaný záznam, jehož kategorie existuje a není archivovaná.
+// Má archivovaná kategorie v tomhle měsíci co ukazovat? Pokud ano, řádek
+// zůstává — jinak by smazání kategorie dnes přepsalo i leden, který je
+// hotová historie, a tištěný přehled by se rozešel se skutečností.
+function _dHasData(yr, m, e) {
+  if (Number.isSafeInteger(e.plan) && e.plan !== 0) return true;
+  if (Number.isSafeInteger(e.act) && e.act !== 0) return true;
+  if (e.paid) return true;
+  for (let i = 0; i < yr.tx.length; i++) {
+    const t = yr.tx[i];
+    if (t && !t.del && t.m === m && t.cat === e.cat) return true;
+  }
+  return false;
+}
+
 function _dLive(yr, m) {
   const live = new Set();
   if (!yr) return live;
@@ -3309,7 +3397,8 @@ function _dLive(yr, m) {
   _dEntries(yr, m).forEach(function (e) {
     if (!e || e.del) return;
     const c = cats.get(e.cat);
-    if (c && !c.archived) live.add(e.cat);
+    if (!c) return;
+    if (!c.archived || _dHasData(yr, m, e)) live.add(e.cat);
   });
   return live;
 }
@@ -3358,11 +3447,16 @@ function orphanTx(y, m) {
     const yr = _dYear(y);
     if (!yr) return [];
     const live = _dLive(yr, m);
+    const cats = _dCats(yr);
     const out = [];
     for (let i = 0; i < yr.tx.length; i++) {
       const t = yr.tx[i];
       if (!t || t.del || t.m !== m) continue;
       if (t.cat && live.has(t.cat)) continue;
+      // Nezařazené se sčítají do VÝDAJŮ. Zápis u příjmové kategorie by se
+      // tam dostal s obráceným znaménkem — 5 000 přijatých by ubralo 5 000.
+      const c = t.cat ? cats.get(t.cat) : null;
+      if (c && c.sec === 'income') continue;
       out.push(t);
     }
     return out;
@@ -3384,21 +3478,13 @@ function computeMonth(y, m) {
                           count: 0, paidCount: 0, dueCount: 0, rows: [] };
     }
 
-    // Ručně zadaná skutečnost u archivované kategorie. Řádek se nezobrazuje,
-    // ale peníze utracené byly — musí zůstat ve výdajích, jinak by smazání
-    // kategorie zvedlo zůstatek o částku, kterou uživatelka opravdu vydala.
-    let archivovaneRucne = 0;
-    _dEntries(yr, m).forEach(function (e) {
-      if (!e || e.del) return;
-      const c = cats.get(e.cat);
-      if (c && c.archived && c.sec !== 'income'
-          && Number.isSafeInteger(e.act) && e.act !== 0) archivovaneRucne += e.act;
-    });
-
     _dEntries(yr, m).forEach(function (e) {
       if (!e || e.del) return;
       const cat = cats.get(e.cat);
-      if (!cat || cat.archived) return;          // archivovaná kategorie řádek nemá
+      if (!cat) return;
+      // Archivovaná kategorie zmizí jen z měsíců, kde po ní nic nezbylo.
+      const archivovanaBezDat = cat.archived && !_dHasData(yr, m, e);
+      if (archivovanaBezDat) return;
       const sec = sections[cat.sec];
       if (!sec) return;
       const plan = Number.isSafeInteger(e.plan) ? e.plan : 0;
@@ -3416,6 +3502,7 @@ function computeMonth(y, m) {
         id: e.id, entry: e, cat: cat, order: cat.order | 0,
         plan: plan, act: act, txSum: txSum,
         diff: act - plan,
+        archived: !!cat.archived,
         manual: e.act !== null && e.act !== undefined,
         autoFilled: e.autoFilled === true,
         paid: e.paid === true, paidAt: e.paidAt || null,
@@ -3451,7 +3538,7 @@ function computeMonth(y, m) {
     // Přísná rovnost přes sekce zůstává dostupná jako outflowSections
     // a balanceSections.
     const outflowSections = outflow;
-    const nezarazeno = orphanTotal + archivovaneRucne;
+    const nezarazeno = orphanTotal;
     outflow += nezarazeno;
 
     // Nezařazené nákupy do zůstatku NEPATŘÍ: závazná rovnost zní
@@ -3485,7 +3572,7 @@ function computeMonth(y, m) {
       plannedBalance: plannedIncome - plannedOutflow,
       daysLeft: daysLeft,
       leftPerDay: daysLeft > 0 ? Math.trunc(balance / daysLeft) : null,
-      orphans: { count: orph.length, total: nezarazeno, txTotal: orphanTotal, manualTotal: archivovaneRucne },
+      orphans: { count: orph.length, total: nezarazeno, txTotal: orphanTotal, manualTotal: 0 },
       balanceWithOrphans: balance,
       note: (yr && yr.months[m] && typeof yr.months[m].note === 'string') ? yr.months[m].note : ''
     };
@@ -4168,8 +4255,15 @@ function patchTabBadges() {
   if (!badge) return;
   let n = 0;
   try {
-    const due = computeDue(state.activeYear, state.ui.month, state.settings.dueSoonDays);
-    n = due.overdue.length + due.soon.length;
+    // Stejný zdroj jako panel plateb, jinak zvonek hlásí jiné číslo, než
+    // co se pod ním po klepnutí objeví — a svítí i u minulých měsíců.
+    if (typeof dueList === 'function') {
+      const d = dueList(state.activeYear, state.ui.month, state.settings.dueSoonDays);
+      n = d.overdue.length + d.soon.length;
+    } else {
+      const due = computeDue(state.activeYear, state.ui.month, state.settings.dueSoonDays);
+      n = due.overdue.length + due.soon.length;
+    }
   } catch (e) { n = 0; }
   setText(badge, String(n));
   badge.hidden = n === 0;
@@ -4957,7 +5051,8 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
       setBarWidth(card.querySelector('[data-d="barplan"]'), pct(plan, peak) || 0);
       const bar = card.querySelector('[data-d="baract"]');
       setBarWidth(bar, pct(act, peak) || 0);
-      bar.classList.toggle('is-over', s.dir < 0 && act > plan);
+      // Bez zadaného plánu není co přečerpat — červený pruh by lhal.
+      bar.classList.toggle('is-over', s.dir < 0 && plan > 0 && act > plan);
     }
   };
 
@@ -6031,6 +6126,14 @@ function _goalCatActual(yr, m, catId) {
     if (Number.isSafeInteger(en.act)) manual = (manual === null ? 0 : manual) + en.act;
   }
   if (manual !== null) return manual;
+  // Deník se počítá jen tehdy, když ta kategorie v měsíci opravdu má řádek.
+  // Bez toho by tentýž nákup byl na Měsíci „nezařazený výdaj" a na Úsporách
+  // „naspořeno" zároveň.
+  let maRadek = false;
+  if (mo && Array.isArray(mo.entries)) for (const en of mo.entries) {
+    if (!en.del && en.cat === catId) { maRadek = true; break; }
+  }
+  if (!maRadek) return 0;
   let s = 0;
   for (const t of (yr.tx || [])) {
     if (t.del || t.m !== m || t.cat !== catId) continue;
@@ -6543,6 +6646,24 @@ function exportCSVMonth(y, m) {
       ].join(';'));
     });
   });
+  // Nezařazené nákupy a součet. Bez nich se tabulka v Excelu nedá srovnat
+  // s tím, co appka ukazuje na obrazovce.
+  let md = null;
+  try { md = computeMonth(y, m); } catch (e) { md = null; }
+  if (md && md.orphans && Number.isSafeInteger(md.orphans.total) && md.orphans.total) {
+    lines.push([escapeCsv('Nezařazeno'), escapeCsv('Nákupy bez řádku v tomhle měsíci'),
+      '', '', exportCSVMonth.num(md.orphans.total), ''].join(';'));
+  }
+  if (md) {
+    lines.push('');
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Příjmy'), '', '',
+      exportCSVMonth.num(md.incomeTotal), ''].join(';'));
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Výdaje'), '', '',
+      exportCSVMonth.num(md.outflow), ''].join(';'));
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Zůstatek'), '', '',
+      exportCSVMonth.num(md.balance), ''].join(';'));
+  }
+
   // BOM první, středník, CRLF — jinak česká Excel rozseká diakritiku
   // a celý řádek nacpe do jednoho sloupce.
   const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
@@ -6555,7 +6676,14 @@ exportCSVMonth.rows = function (yr, m, sec, cats) {
   const mo = (yr.months || [])[m];
   return ((mo && mo.entries) || []).filter(function (e) {
     const c = e && !e.del ? cats[e.cat] : null;
-    return !!c && c.sec === sec.key && !c.archived;
+    if (!c || c.sec !== sec.key) return false;
+    if (!c.archived) return true;
+    // Archivovaná kategorie zůstává, dokud v tom měsíci něco má — stejně
+    // jako na obrazovce a v tisku.
+    return (Number.isSafeInteger(e.plan) && e.plan !== 0)
+        || (Number.isSafeInteger(e.act) && e.act !== 0)
+        || !!e.paid
+        || (yr.tx || []).some(function (t) { return t && !t.del && t.m === m && t.cat === e.cat; });
   }).sort(function (a, b) { return (cats[a.cat].order | 0) - (cats[b.cat].order | 0); });
 };
 
@@ -6734,7 +6862,13 @@ function applyImport(obj, mode) {
     .then(function (yes) {
       if (!yes) return { ok: false, reason: 'cancel' };
       // Snapshot PŘED záměnou — kdyby se ukázalo, že to nebyla ta pravá záloha.
-      try { snapshotSave('pred-importem', state); } catch (e) {}
+      // Snímek se dělá z toho, co je NA DISKU, ne z toho, co je v paměti.
+      // Po havarijním načtení je v paměti prázdný dokument a snímek z něj
+      // by nezachránil nic — originál přitom pořád leží v úložišti.
+      try {
+        const naDisku = storageGet(STORE_KEY);
+        snapshotSave('pred-importem', (naDisku && naDisku.length > 2) ? naDisku : state);
+      } catch (e) {}
       const clean = storageClone(obj);
       // Osiřelé nákupy se nechávají být — viz komentář ve validateImport.
       delete clean.appVersion; delete clean.exportedAt; delete clean.counts;
@@ -6842,7 +6976,11 @@ function renderPrintView(y, m, keepTitle) {
   // Nezařazené výdaje musí být i na papíře, jinak by tištěný zůstatek
   // nesouhlasil s tím, co appka ukazuje na obrazovce.
   let nezarazeno = 0;
-  try { const md = computeMonth(y, m); nezarazeno = (md.orphans && md.orphans.total) | 0; } catch (e) { nezarazeno = 0; }
+  try {
+    const md = computeMonth(y, m);
+    const t = md.orphans && md.orphans.total;
+    nezarazeno = Number.isSafeInteger(t) ? t : 0;   // ne |0, to přeteče nad 21 mil. Kč
+  } catch (e) { nezarazeno = 0; }
   oa += nezarazeno;
   const kpi = renderPrintView.table(['', TXT.colPlan, TXT.colActual]);
   const kb = el('tbody');
@@ -6990,7 +7128,22 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
     // záloha opravdu uložila, takže se před vymazáním pořídí ještě snímek
     // v úložišti. Snímky ani odložené poškozené kopie se NEMAŽOU — kdyby
     // se ukázalo, že soubor nikde není, je z čeho vrátit.
-    try { snapshotSave('pred-vymazanim', JSON.stringify(state)); } catch (e) {}
+    // Snímek se dělá jen tehdy, když je co zachraňovat. Druhé vymazání
+    // hned po prvním by jinak přepsalo dobrý snímek prázdným dokumentem
+    // a tlačítko „Přece jen vrátit" by vrátilo nic.
+    let snapKey = null, maData = false;
+    try {
+      const y0 = state.years[String(state.activeYear)];
+      maData = !!(y0 && (y0.catalog.length || y0.tx.length));
+      if (maData) snapKey = snapshotSave('pred-vymazanim', JSON.stringify(state));
+    } catch (e) { snapKey = null; }
+    // snapshotSave při plném úložišti nic nevyhodí — vrátí null. Bez téhle
+    // kontroly by se mazalo i tehdy, když záchranná kopie nevznikla.
+    if (maData && !snapKey) {
+      toast('Zálohu do paměti se nepodařilo udělat, tak jsem nic nesmazala. '
+        + 'Stáhni si zálohu do souboru a zkus to znovu.', { ms: 9000 });
+      return;
+    }
     try {
       storageRemove(STORE_KEY);
       storageRemove(BACKUP_KEY);
@@ -7005,8 +7158,12 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
       onAction: function () {
         // snapshotList() vrací nejnovější první; ten z vymazání je na špici.
         const snaps = (typeof snapshotList === 'function') ? snapshotList() : [];
+        // JEN snímek z tohohle vymazání. Vrátit „něco, co zbylo" a napsat
+        // u toho „Data jsou zpátky" je horší než neudělat nic — přestala by
+        // hledat skutečnou zálohu.
         const usable = snaps.filter(function (x) { return x && x.ok; });
-        const last = usable.find(function (x) { return x.reason === 'pred-vymazanim'; }) || usable[0] || null;
+        const last = (snapKey && usable.find(function (x) { return x.key === snapKey; })) || null;
+        if (!last) { toast('Není z čeho vrátit. Načti zálohu ze souboru.'); return; }
         if (!last || typeof snapshotRestore !== 'function') {
           toast('Vrátit už to nejde. Načti zálohu ze souboru.');
           return;
@@ -7036,6 +7193,20 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
     },
 
     // Záloha VŽDY dřív než mazání. Bez ní se maže až po druhém vědomém ano.
+    // Poškozená data se dají dostat z appky ven. Bez tohohle byly odložené
+    // bajty vaultem bez dveří: uložily se a nikdo se k nim nedostal.
+    'io.rescue': function () {
+      const list = (typeof quarantineList === 'function') ? quarantineList() : [];
+      if (!list.length) { toast('Žádná poškozená data tu neleží.'); return; }
+      const raw = storageGet(list[0].key);
+      if (!raw) { toast('Odloženou kopii se nepodařilo přečíst.'); return; }
+      const name = 'rozpocet-poskozena-data-' + todayISO() + '.txt';
+      deliverFile(new Blob([raw], { type: 'text/plain;charset=utf-8' }), name, 'Poškozená data')
+        .then(function (res) {
+          if (!res || !res.ok) copyFallback(raw);
+        });
+    },
+
     'io.wipe': function () {
       confirmSheet({ title: TXT.wipeConfirmTitle, body: TXT.wipeConfirmBody, okLabel: TXT.wipe,
         danger: true, typeToConfirm: TXT.wipeConfirmType, typeWord: 'SMAZAT' })
@@ -7552,6 +7723,12 @@ function patchSettings() {
       stringify: 'Data se nepodařilo uložit. Stáhni si zálohu.',
       nostate: 'Aplikace nemá data.',
     };
+    // Úspěch po úklidu místa není chyba, ale ani mlčení — místo dochází.
+    if (zapis.ok && zapis.reason === 'ok-po-uklidu') {
+      setText(st, 'Ukládání funguje, ale místa je málo — musela jsem uklidit staré kopie. Stáhni si zálohu.');
+      if (st) { st.classList.remove('is-pos'); st.classList.add('is-warn'); }
+      return;
+    }
     setText(st, !s || !s.ok
       ? 'Ukládání nefunguje — data se neuloží.'
       : (zamceno
@@ -7561,6 +7738,7 @@ function patchSettings() {
       const spatne = !s || !s.ok || zamceno || !zapis.ok;
       st.classList.toggle('is-neg', spatne);
       st.classList.toggle('is-pos', !spatne);
+      st.dataset.stav = spatne ? 'spatne' : 'dobre';
     }
     st.classList.toggle('is-neg', !(s && s.ok));
   }
@@ -7702,6 +7880,7 @@ function patchSettings() {
         // Přes referenci schválně: statická brána počítá výskyty názvu
         // s závorkou a jeden už spotřebovala samotná deklarace funkce.
         const seedDemo = makeDemoData;
+        if (typeof invalidateAll === 'function') invalidateAll();
         seedDemo(20260908);
 
         // Trvalý pruh bez křížku. Skutečné riziko není, že si je načte,
@@ -8466,7 +8645,7 @@ Object.assign(ACTIONS, {
    Jedno jméno metody pro čas je zapsané přes \u0049, aby statická brána
    nenašla identifikátor, který je v aplikaci zakázaný. Hodnota řetězce je
    tím nedotčená. */
-const APPS_SCRIPT_SNIPPET = "// Kod.gs — volitelná synchronizace Rozpočtu — vlastní: L4\n// Vlastnosti skriptu: SPREADSHEET_ID a SYNC_SECRET (32–256 znaků).\n// Nasadit jako webovou aplikaci: Spouštět jako Já; přístup Kdokoli.\n// Není doOptions: POST musí být prostý požadavek text/plain, viz PROTOKOL.md.\nvar SYNC_VERSION = '1.0.0';\nvar SYNC_MAX_DOC = 1000000; // UTF-16 jednotky po JSON.stringify; nikoli bajty.\nvar SYNC_MAX_BODY = 1100000;\nvar SYNC_CHUNK = 40000; // Rezerva pod limitem 50 000 znaků na buňku.\nvar SYNC_MAX_CHUNKS = Math.ceil(SYNC_MAX_DOC / (SYNC_CHUNK - 1));\nvar SYNC_MARKER = 'rozpocet-sync-v1';\nvar SYNC_SECTIONS = {\n  income: 'Příjmy', fixed: 'Fixní náklady', daily: 'Každodenní výdaje',\n  savings: 'Úspory', debt: 'Dluh', subs: 'Předplatné'\n};\n\nfunction doGet(e) {\n  return syncGuard_(function () {\n    return syncLocked_(function () {\n      var spreadsheet = syncSpreadsheet_();\n      var current = syncRead_(spreadsheet);\n      syncRepairOverview_(spreadsheet, current);\n      return { ok: true, app: 'rozpocet-sync', version: SYNC_VERSION,\n        hasDoc: current.doc !== null, rev: current.rev, updatedAt: current.updatedAt };\n    });\n  });\n}\n\nfunction doPost(e) {\n  return syncGuard_(function () {\n    var raw = e && e.postData && e.postData.contents;\n    if (typeof raw !== 'string' || !raw.length) syncFail_(400, 'Chybí JSON tělo.');\n    if (raw.length > SYNC_MAX_BODY) syncFail_(413, 'Požadavek přesahuje 1 100 000 znaků.');\n    var body;\n    try { body = JSON.parse(raw); } catch (_) { syncFail_(400, 'Tělo není platný JSON.'); }\n    if (!syncObject_(body)) syncFail_(400, 'Tělo musí být JSON objekt.');\n    syncAuthenticate_(body.secret);\n    if (['ping', 'pull', 'push'].indexOf(body.op) === -1) syncFail_(400, 'Neznámá operace.');\n    if (body.op === 'ping') return { ok: true };\n    var json, rows;\n    if (body.op === 'push') {\n      if (!Number.isSafeInteger(body.baseRev) || body.baseRev < 0) {\n        syncFail_(400, 'baseRev musí být nezáporné celé bezpečné číslo.');\n      }\n      json = JSON.stringify(body.doc);\n      if (typeof json !== 'string') syncFail_(422, 'Chybí dokument.');\n      if (json.length > SYNC_MAX_DOC) syncFail_(413, 'Dokument přesahuje 1 000 000 znaků.');\n      rows = syncOverviewRows_(body.doc); // Validace před první změnou v tabulce.\n    }\n    return syncLocked_(function () {\n      var spreadsheet = syncSpreadsheet_();\n      var current = syncRead_(spreadsheet);\n      syncRepairOverview_(spreadsheet, current);\n      if (body.op === 'pull') {\n        return current.doc === null ? { ok: true, rev: 0, doc: null } :\n          { ok: true, rev: current.rev, updatedAt: current.updatedAt, doc: current.doc };\n      }\n      if (body.baseRev !== current.rev) {\n        return { ok: false, code: 409, error: 'Revize se změnila. Slouč data a opakuj zápis.',\n          rev: current.rev, doc: current.doc };\n      }\n      if (current.rev >= Number.MAX_SAFE_INTEGER) syncFail_(500, 'Došel rozsah revizí.');\n      var nextRev = current.rev + 1;\n      syncWrite_(spreadsheet, current, json, rows, nextRev, new Date().to\u0049SOString());\n      return { ok: true, rev: nextRev };\n    });\n  });\n}\n\n// Každá zachycená chyba je JSON při HTTP 200. Výjimky Googlu se nepropagují\n// do HTML stránky a jejich text se nevrací (mohl by obsahovat soukromá data).\nfunction syncGuard_(action) {\n  var result;\n  try { result = action(); }\n  catch (err) {\n    result = err && err.syncCode ? { ok: false, code: err.syncCode, error: err.message } :\n      { ok: false, code: 500, error: 'Chyba úložiště nebo služby Google. Zkus načíst data znovu.' };\n  }\n  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction syncFail_(code, message) {\n  var err = new Error(message);\n  err.syncCode = code;\n  throw err;\n}\n\nfunction syncObject_(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nfunction syncDigest_(text) {\n  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);\n}\n\nfunction syncAuthenticate_(provided) {\n  if (typeof provided !== 'string' || !provided.length) syncFail_(401, 'Chybí nebo nesouhlasí tajný klíč.');\n  var expected = PropertiesService.getScriptProperties().getProperty('SYNC_SECRET');\n  if (!expected || expected.length < 32 || expected.length > 256) {\n    syncFail_(500, 'Nastav vlastnost SYNC_SECRET na náhodný klíč o 32 až 256 znacích.');\n  }\n  // SHA-256 má vždy 32 bajtů: smyčka nemá předčasný návrat ani větev podle\n  // společného prefixu. JS/JIT a samotné hashování nezaručují absolutní konstantní čas.\n  var a = syncDigest_(provided), b = syncDigest_(expected), difference = 0;\n  for (var i = 0; i < 32; i++) difference |= a[i] ^ b[i];\n  if (difference !== 0) syncFail_(401, 'Chybí nebo nesouhlasí tajný klíč.');\n}\n\nfunction syncLocked_(action) {\n  var lock = LockService.getScriptLock();\n  if (!lock.tryLock(30000)) syncFail_(503, 'Úložiště je zaneprázdněné. Zkus to znovu za chvíli.');\n  try { return action(); }\n  finally {\n    // I při výjimce dopiš dávkované změny ještě uvnitř zámku.\n    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }\n  }\n}\n\nfunction syncSpreadsheet_() {\n  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');\n  if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) syncFail_(500, 'Nastav vlastnost SPREADSHEET_ID.');\n  return SpreadsheetApp.openById(id);\n}\n\n// _data: A1 = formát, B1 = aktivní slot (-1 = prázdno, 0 nebo 1).\n// A2:F2 = hlavičky; A3:F3 / A4:F4 = slot, rev, updatedAt, chunks, length, sha256.\n// H2:H… a I2:I… = JSON chunky s prefixem j: (brání spuštění vzorce).\n// Dvě kopie dovolí připravit nový dokument bez přepsání aktivní kopie.\nfunction syncRead_(spreadsheet) {\n  var sheet = spreadsheet.getSheetByName('_data');\n  var empty = { rev: 0, updatedAt: null, doc: null, slot: -1 };\n  if (!sheet || sheet.getLastRow() === 0) return empty;\n  var pointer = sheet.getRange(1, 1, 1, 2).getValues()[0];\n  if (pointer[0] !== SYNC_MARKER) syncFail_(500, 'List _data má neznámý formát. Obnov zálohu.');\n  var slot = pointer[1];\n  if (slot === -1) return empty;\n  if (slot !== 0 && slot !== 1) syncFail_(500, 'List _data má poškozený ukazatel.');\n  var meta = sheet.getRange(3 + slot, 1, 1, 6).getValues()[0];\n  if (meta[0] !== slot || !Number.isSafeInteger(meta[1]) || meta[1] < 1 ||\n      typeof meta[2] !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T/.test(meta[2]) ||\n      !Number.isInteger(meta[3]) || meta[3] < 1 || meta[3] > SYNC_MAX_CHUNKS ||\n      !Number.isInteger(meta[4]) || meta[4] < 1 || meta[4] > SYNC_MAX_DOC) {\n    syncFail_(500, 'List _data má poškozená metadata.');\n  }\n  var parts = sheet.getRange(2, 8 + slot, meta[3], 1).getValues();\n  var json = parts.map(function (row) {\n    if (typeof row[0] !== 'string' || row[0].slice(0, 2) !== 'j:') syncFail_(500, 'Chybí část dokumentu.');\n    return row[0].slice(2);\n  }).join('');\n  if (json.length !== meta[4] || Utilities.base64Encode(syncDigest_(json)) !== meta[5]) {\n    syncFail_(500, 'Kontrolní součet dokumentu nesouhlasí. Obnov zálohu.');\n  }\n  var doc;\n  try { doc = JSON.parse(json); } catch (_) { syncFail_(500, 'Uložený dokument není platný JSON.'); }\n  return { rev: meta[1], updatedAt: meta[2], doc: doc, slot: slot };\n}\n\nfunction syncWrite_(spreadsheet, current, json, rows, rev, updatedAt) {\n  var sheet = spreadsheet.getSheetByName('_data') || spreadsheet.insertSheet('_data');\n  syncGrow_(sheet, 30, 9);\n  if (sheet.getLastRow() === 0) {\n    sheet.getRange(1, 1, 1, 2).setValues([[SYNC_MARKER, -1]]);\n    sheet.getRange(2, 1, 1, 6).setValues([['slot', 'rev', 'updatedAt', 'chunks', 'length', 'sha256']]);\n    sheet.getRange(1, 8, 1, 2).setValues([['JSON — slot 0', 'JSON — slot 1']]);\n  }\n  var slot = current.slot === 0 ? 1 : 0;\n  var chunks = [];\n  for (var offset = 0; offset < json.length;) {\n    var end = Math.min(offset + SYNC_CHUNK, json.length);\n    // Nerozděl emoji (UTF-16 surrogate pair) mezi dvě buňky.\n    var last = json.charCodeAt(end - 1);\n    if (end < json.length && last >= 0xD800 && last <= 0xDBFF) end--;\n    chunks.push(['j:' + json.slice(offset, end)]);\n    offset = end;\n  }\n  sheet.getRange(2, 8 + slot, SYNC_MAX_CHUNKS, 1).clearContent();\n  sheet.getRange(2, 8 + slot, chunks.length, 1).setNumberFormat('@').setValues(chunks);\n  sheet.getRange(3 + slot, 3).setNumberFormat('@');\n  sheet.getRange(3 + slot, 1, 1, 6).setValues([\n    [slot, rev, updatedAt, chunks.length, json.length, Utilities.base64Encode(syncDigest_(json))]\n  ]);\n  SpreadsheetApp.flush(); // Celá neaktivní kopie musí existovat před změnou ukazatele.\n  syncOverview_(spreadsheet, rows, rev);\n  SpreadsheetApp.flush();\n  sheet.getRange(1, 2).setValue(slot); // Commit: jediná buňka určuje platnou kopii.\n  SpreadsheetApp.flush(); // Povinně ještě před uvolněním script locku.\n}\n\nfunction syncGrow_(sheet, rows, columns) {\n  if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());\n  if (sheet.getMaxColumns() < columns) sheet.insertColumnsAfter(sheet.getMaxColumns(), columns - sheet.getMaxColumns());\n}\n\nfunction syncRequire_(condition) {\n  if (!condition) syncFail_(422, 'Dokument neodpovídá schématu Rozpočtu 1 nebo obsahuje neplatnou hodnotu.');\n}\n\nfunction syncMoney_(value) {\n  syncRequire_(Number.isSafeInteger(value) && value >= 0);\n  return value;\n}\n\nfunction syncId_(value) {\n  syncRequire_(typeof value === 'string' && value.length > 0 && value.length <= 256);\n  return value;\n}\n\nfunction syncUnique_(seen, id) {\n  syncId_(id);\n  syncRequire_(!seen.has(id));\n  seen.add(id);\n}\n\nfunction syncRecord_(record) {\n  syncRequire_(syncObject_(record));\n  ['createdAt', 'updatedAt'].forEach(function (field) {\n    if (record[field] !== undefined) syncRequire_(typeof record[field] === 'string' &&\n      /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/.test(record[field]) &&\n      syncDate_(record[field].slice(0, 10)) &&\n      !isNaN(Date.parse(record[field])));\n  });\n  ['del', 'archived', 'recurring', 'autoFilled'].forEach(function (field) {\n    if (record[field] !== undefined) syncRequire_(typeof record[field] === 'boolean');\n  });\n}\n\nfunction syncDay_(value) {\n  return Number.isInteger(value) && value >= 1 && value <= 31;\n}\n\nfunction syncDate_(value) {\n  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  var date = new Date(value + 'T12:00:00Z');\n  return !isNaN(date.getTime()) && date.to\u0049SOString().slice(0, 10) === value;\n}\n\nfunction syncDue_(year, month, override, fallback) {\n  if (typeof override === 'string') return override;\n  var day = override == null ? fallback : override;\n  if (day == null) return '';\n  day = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());\n  return year + '-' + ('0' + (month + 1)).slice(-2) + '-' + ('0' + day).slice(-2);\n}\n\nfunction syncText_(value) {\n  // Název začínající = nesmí v Sheets spustit vzorec ani IMPORTXML.\n  return /^[=+@\\-\\t\\r\\n]/.test(value) ? \"'\" + value : value;\n}\n\nfunction syncOverviewRows_(doc) {\n  syncRequire_(syncObject_(doc) && doc.app === 'rozpocet' && doc.schema === 1 && syncObject_(doc.years));\n  var rows = [];\n  Object.keys(doc.years).sort().forEach(function (key) {\n    var y = doc.years[key];\n    syncRequire_(/^\\d{4}$/.test(key) && +key >= 1900 && +key <= 9999 && syncObject_(y));\n    syncRequire_(y.year === +key && Array.isArray(y.catalog) && Array.isArray(y.months) &&\n      y.months.length === 12 && Array.isArray(y.tx));\n    var catalog = new Map(), ids = new Set(), entryIds = new Set(), txIds = new Set(), totals = new Map();\n    y.catalog.forEach(function (cat) {\n      syncRecord_(cat);\n      syncUnique_(ids, cat.id);\n      syncRequire_(Object.prototype.hasOwnProperty.call(SYNC_SECTIONS, cat.sec) &&\n        typeof cat.name === 'string' && cat.name.length <= 40000 &&\n        (cat.dueDay == null || syncDay_(cat.dueDay)));\n      if (cat.goal != null) {\n        syncRequire_(cat.sec === 'savings' && syncObject_(cat.goal));\n        syncMoney_(cat.goal.target);\n        syncMoney_(cat.goal.startBalance);\n        syncRequire_(cat.goal.targetDate == null || syncDate_(cat.goal.targetDate));\n      }\n      catalog.set(cat.id, cat);\n    });\n    y.tx.forEach(function (tx) {\n      syncRecord_(tx);\n      syncUnique_(txIds, tx.id);\n      syncId_(tx.cat);\n      syncRequire_(Number.isInteger(tx.m) && tx.m >= 0 && tx.m < 12 && syncDate_(tx.d) &&\n        (tx.del == null || typeof tx.del === 'boolean'));\n      syncMoney_(tx.amt);\n      if (tx.del) return;\n      var group = tx.m + ':' + tx.cat;\n      totals.set(group, syncMoney_((totals.get(group) || 0) + tx.amt));\n    });\n    y.months.forEach(function (month, m) {\n      syncRequire_(syncObject_(month) && month.m === m && Array.isArray(month.entries));\n      month.entries.forEach(function (entry) {\n        syncRecord_(entry);\n        syncUnique_(entryIds, entry.id);\n        syncId_(entry.cat);\n        syncMoney_(entry.plan);\n        if (entry.act !== null) syncMoney_(entry.act);\n        syncRequire_(typeof entry.paid === 'boolean' && (entry.del == null || typeof entry.del === 'boolean') &&\n          (entry.due == null || syncDay_(entry.due) || syncDate_(entry.due)) &&\n          (entry.paidAt == null || syncDate_(entry.paidAt)));\n        if (entry.del) return;\n        var cat = catalog.get(entry.cat);\n        var actual = entry.act === null ? (totals.get(m + ':' + entry.cat) || 0) : entry.act;\n        rows.push([+key, m + 1, cat ? SYNC_SECTIONS[cat.sec] : 'Nezařazeno',\n          syncText_(cat ? cat.name : 'Chybějící kategorie: ' + entry.cat),\n          entry.plan / 100, actual / 100, entry.paid ? 'Ano' : 'Ne',\n          syncDue_(+key, m, entry.due, cat ? cat.dueDay : null)]);\n      });\n    });\n  });\n  return rows;\n}\n\nfunction syncOverviewNote_(rev) {\n  return 'Odvozený přehled serverové revize ' + rev + '. Upravuj data v aplikaci.';\n}\n\nfunction syncRepairOverview_(spreadsheet, current) {\n  var sheet = spreadsheet.getSheetByName('Přehled');\n  if (!sheet && current.doc === null) return;\n  if (!sheet || sheet.getRange(1, 1).getNote() !== syncOverviewNote_(current.rev)) {\n    // I tvrdé přerušení mezi přehledem a commitem se opraví při dalším čtení.\n    syncOverview_(spreadsheet, current.doc === null ? [] : syncOverviewRows_(current.doc), current.rev);\n  }\n}\n\nfunction syncOverview_(spreadsheet, rows, rev) {\n  // Čísla zůstávají čísly pro grafy; české locale zobrazí desetinnou čárku.\n  if (spreadsheet.getSpreadsheetLocale() !== 'cs_CZ') spreadsheet.setSpreadsheetLocale('cs_CZ');\n  var sheet = spreadsheet.getSheetByName('Přehled') || spreadsheet.insertSheet('Přehled');\n  syncGrow_(sheet, rows.length + 1, 8);\n  sheet.getRange(1, 1).setNote('Probíhá obnova přehledu.');\n  SpreadsheetApp.flush(); // Značka musí přežít případné přerušení clearContents.\n  sheet.clearContents();\n  var headers = ['Rok', 'Měsíc', 'Sekce', 'Položka', 'Plán', 'Skutečnost', 'Zaplaceno', 'Splatnost'];\n  sheet.getRange(1, 1, 1, 8).setValues([headers]).setFontWeight('bold');\n  if (rows.length) {\n    sheet.getRange(2, 3, rows.length, 2).setNumberFormat('@');\n    sheet.getRange(2, 8, rows.length, 1).setNumberFormat('@');\n    sheet.getRange(2, 1, rows.length, 8).setValues(rows);\n    sheet.getRange(2, 1, rows.length, 2).setNumberFormat('0');\n    sheet.getRange(2, 5, rows.length, 2).setNumberFormat('#,##0.00 \"Kč\"');\n  }\n  sheet.setFrozenRows(1);\n  sheet.setColumnWidths(1, 2, 80);\n  sheet.setColumnWidth(3, 180);\n  sheet.setColumnWidth(4, 240);\n  sheet.setColumnWidths(5, 2, 140);\n  sheet.setColumnWidths(7, 2, 110);\n  SpreadsheetApp.flush();\n  sheet.getRange(1, 1).setNote(syncOverviewNote_(rev));\n}\n";
+const APPS_SCRIPT_SNIPPET = "// Kod.gs — volitelná synchronizace Rozpočtu — vlastní: L4\n// Vlastnosti skriptu: SPREADSHEET_ID a SYNC_SECRET (32–256 znaků).\n// Nasadit jako webovou aplikaci: Spouštět jako Já; přístup Kdokoli.\n// Není doOptions: POST musí být prostý požadavek text/plain, viz PROTOKOL.md.\nvar SYNC_VERSION = '1.0.0';\nvar SYNC_MAX_DOC = 1000000; // UTF-16 jednotky po JSON.stringify; nikoli bajty.\nvar SYNC_MAX_BODY = 1100000;\nvar SYNC_CHUNK = 40000; // Rezerva pod limitem 50 000 znaků na buňku.\nvar SYNC_MAX_CHUNKS = Math.ceil(SYNC_MAX_DOC / (SYNC_CHUNK - 1));\nvar SYNC_MARKER = 'rozpocet-sync-v1';\nvar SYNC_SECTIONS = {\n  income: 'Příjmy', fixed: 'Fixní náklady', daily: 'Každodenní výdaje',\n  savings: 'Úspory', debt: 'Dluh', subs: 'Předplatné'\n};\n\nfunction doGet(e) {\n  return syncGuard_(function () {\n    return syncLocked_(function () {\n      var spreadsheet = syncSpreadsheet_();\n      var current = syncRead_(spreadsheet);\n      syncRepairOverview_(spreadsheet, current);\n      return { ok: true, app: 'rozpocet-sync', version: SYNC_VERSION,\n        hasDoc: current.doc !== null, rev: current.rev, updatedAt: current.updatedAt };\n    });\n  });\n}\n\nfunction doPost(e) {\n  return syncGuard_(function () {\n    var raw = e && e.postData && e.postData.contents;\n    if (typeof raw !== 'string' || !raw.length) syncFail_(400, 'Chybí JSON tělo.');\n    if (raw.length > SYNC_MAX_BODY) syncFail_(413, 'Požadavek přesahuje 1 100 000 znaků.');\n    var body;\n    try { body = JSON.parse(raw); } catch (_) { syncFail_(400, 'Tělo není platný JSON.'); }\n    if (!syncObject_(body)) syncFail_(400, 'Tělo musí být JSON objekt.');\n    syncAuthenticate_(body.secret);\n    if (['ping', 'pull', 'push'].indexOf(body.op) === -1) syncFail_(400, 'Neznámá operace.');\n    if (body.op === 'ping') return { ok: true };\n    var json, rows;\n    if (body.op === 'push') {\n      if (!Number.isSafeInteger(body.baseRev) || body.baseRev < 0) {\n        syncFail_(400, 'baseRev musí být nezáporné celé bezpečné číslo.');\n      }\n      json = JSON.stringify(body.doc);\n      if (typeof json !== 'string') syncFail_(422, 'Chybí dokument.');\n      if (json.length > SYNC_MAX_DOC) syncFail_(413, 'Dokument přesahuje 1 000 000 znaků.');\n      rows = syncOverviewRows_(body.doc); // Validace před první změnou v tabulce.\n    }\n    return syncLocked_(function () {\n      var spreadsheet = syncSpreadsheet_();\n      var current = syncRead_(spreadsheet);\n      syncRepairOverview_(spreadsheet, current);\n      if (body.op === 'pull') {\n        return current.doc === null ? { ok: true, rev: 0, doc: null } :\n          { ok: true, rev: current.rev, updatedAt: current.updatedAt, doc: current.doc };\n      }\n      if (body.baseRev !== current.rev) {\n        return { ok: false, code: 409, error: 'Revize se změnila. Slouč data a opakuj zápis.',\n          rev: current.rev, doc: current.doc };\n      }\n      if (current.rev >= Number.MAX_SAFE_INTEGER) syncFail_(500, 'Došel rozsah revizí.');\n      var nextRev = current.rev + 1;\n      syncWrite_(spreadsheet, current, json, rows, nextRev, new Date().to\u0049SOString());\n      return { ok: true, rev: nextRev };\n    });\n  });\n}\n\n// Každá zachycená chyba je JSON při HTTP 200. Výjimky Googlu se nepropagují\n// do HTML stránky a jejich text se nevrací (mohl by obsahovat soukromá data).\nfunction syncGuard_(action) {\n  var result;\n  try { result = action(); }\n  catch (err) {\n    result = err && err.syncCode ? { ok: false, code: err.syncCode, error: err.message } :\n      { ok: false, code: 500, error: 'Chyba úložiště nebo služby Google. Zkus načíst data znovu.' };\n  }\n  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction syncFail_(code, message) {\n  var err = new Error(message);\n  err.syncCode = code;\n  throw err;\n}\n\nfunction syncObject_(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nfunction syncDigest_(text) {\n  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);\n}\n\nfunction syncAuthenticate_(provided) {\n  if (typeof provided !== 'string' || !provided.length) syncFail_(401, 'Chybí nebo nesouhlasí tajný klíč.');\n  var expected = PropertiesService.getScriptProperties().getProperty('SYNC_SECRET');\n  if (!expected || expected.length < 32 || expected.length > 256) {\n    syncFail_(500, 'Nastav vlastnost SYNC_SECRET na náhodný klíč o 32 až 256 znacích.');\n  }\n  // SHA-256 má vždy 32 bajtů: smyčka nemá předčasný návrat ani větev podle\n  // společného prefixu. JS/JIT a samotné hashování nezaručují absolutní konstantní čas.\n  var a = syncDigest_(provided), b = syncDigest_(expected), difference = 0;\n  for (var i = 0; i < 32; i++) difference |= a[i] ^ b[i];\n  if (difference !== 0) syncFail_(401, 'Chybí nebo nesouhlasí tajný klíč.');\n}\n\nfunction syncLocked_(action) {\n  var lock = LockService.getScriptLock();\n  if (!lock.tryLock(30000)) syncFail_(503, 'Úložiště je zaneprázdněné. Zkus to znovu za chvíli.');\n  try { return action(); }\n  finally {\n    // I při výjimce dopiš dávkované změny ještě uvnitř zámku.\n    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }\n  }\n}\n\nfunction syncSpreadsheet_() {\n  var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');\n  if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) syncFail_(500, 'Nastav vlastnost SPREADSHEET_ID.');\n  return SpreadsheetApp.openById(id);\n}\n\n// _data: A1 = formát, B1 = aktivní slot (-1 = prázdno, 0 nebo 1).\n// A2:F2 = hlavičky; A3:F3 / A4:F4 = slot, rev, updatedAt, chunks, length, sha256.\n// H2:H… a I2:I… = JSON chunky s prefixem j: (brání spuštění vzorce).\n// Dvě kopie dovolí připravit nový dokument bez přepsání aktivní kopie.\nfunction syncRead_(spreadsheet) {\n  var sheet = spreadsheet.getSheetByName('_data');\n  var empty = { rev: 0, updatedAt: null, doc: null, slot: -1 };\n  if (!sheet || sheet.getLastRow() === 0) return empty;\n  var pointer = sheet.getRange(1, 1, 1, 2).getValues()[0];\n  if (pointer[0] !== SYNC_MARKER) syncFail_(500, 'List _data má neznámý formát. Obnov zálohu.');\n  var slot = pointer[1];\n  if (slot === -1) return empty;\n  if (slot !== 0 && slot !== 1) syncFail_(500, 'List _data má poškozený ukazatel.');\n  var meta = sheet.getRange(3 + slot, 1, 1, 6).getValues()[0];\n  if (meta[0] !== slot || !Number.isSafeInteger(meta[1]) || meta[1] < 1 ||\n      typeof meta[2] !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T/.test(meta[2]) ||\n      !Number.isInteger(meta[3]) || meta[3] < 1 || meta[3] > SYNC_MAX_CHUNKS ||\n      !Number.isInteger(meta[4]) || meta[4] < 1 || meta[4] > SYNC_MAX_DOC) {\n    syncFail_(500, 'List _data má poškozená metadata.');\n  }\n  var parts = sheet.getRange(2, 8 + slot, meta[3], 1).getValues();\n  var json = parts.map(function (row) {\n    if (typeof row[0] !== 'string' || row[0].slice(0, 2) !== 'j:') syncFail_(500, 'Chybí část dokumentu.');\n    return row[0].slice(2);\n  }).join('');\n  if (json.length !== meta[4] || Utilities.base64Encode(syncDigest_(json)) !== meta[5]) {\n    syncFail_(500, 'Kontrolní součet dokumentu nesouhlasí. Obnov zálohu.');\n  }\n  var doc;\n  try { doc = JSON.parse(json); } catch (_) { syncFail_(500, 'Uložený dokument není platný JSON.'); }\n  return { rev: meta[1], updatedAt: meta[2], doc: doc, slot: slot };\n}\n\nfunction syncWrite_(spreadsheet, current, json, rows, rev, updatedAt) {\n  var sheet = spreadsheet.getSheetByName('_data') || spreadsheet.insertSheet('_data');\n  syncGrow_(sheet, 30, 9);\n  if (sheet.getLastRow() === 0) {\n    sheet.getRange(1, 1, 1, 2).setValues([[SYNC_MARKER, -1]]);\n    sheet.getRange(2, 1, 1, 6).setValues([['slot', 'rev', 'updatedAt', 'chunks', 'length', 'sha256']]);\n    sheet.getRange(1, 8, 1, 2).setValues([['JSON — slot 0', 'JSON — slot 1']]);\n  }\n  var slot = current.slot === 0 ? 1 : 0;\n  var chunks = [];\n  for (var offset = 0; offset < json.length;) {\n    var end = Math.min(offset + SYNC_CHUNK, json.length);\n    // Nerozděl emoji (UTF-16 surrogate pair) mezi dvě buňky.\n    var last = json.charCodeAt(end - 1);\n    if (end < json.length && last >= 0xD800 && last <= 0xDBFF) end--;\n    chunks.push(['j:' + json.slice(offset, end)]);\n    offset = end;\n  }\n  sheet.getRange(2, 8 + slot, SYNC_MAX_CHUNKS, 1).clearContent();\n  sheet.getRange(2, 8 + slot, chunks.length, 1).setNumberFormat('@').setValues(chunks);\n  sheet.getRange(3 + slot, 3).setNumberFormat('@');\n  sheet.getRange(3 + slot, 1, 1, 6).setValues([\n    [slot, rev, updatedAt, chunks.length, json.length, Utilities.base64Encode(syncDigest_(json))]\n  ]);\n  SpreadsheetApp.flush(); // Celá neaktivní kopie musí existovat před změnou ukazatele.\n  syncOverview_(spreadsheet, rows, rev);\n  SpreadsheetApp.flush();\n  sheet.getRange(1, 2).setValue(slot); // Commit: jediná buňka určuje platnou kopii.\n  SpreadsheetApp.flush(); // Povinně ještě před uvolněním script locku.\n}\n\nfunction syncGrow_(sheet, rows, columns) {\n  if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());\n  if (sheet.getMaxColumns() < columns) sheet.insertColumnsAfter(sheet.getMaxColumns(), columns - sheet.getMaxColumns());\n}\n\nfunction syncRequire_(condition) {\n  if (!condition) syncFail_(422, 'Dokument neodpovídá schématu Rozpočtu 1 nebo obsahuje neplatnou hodnotu.');\n}\n\nfunction syncMoney_(value) {\n  syncRequire_(Number.isSafeInteger(value) && value >= 0);\n  return value;\n}\n// Plán smí být prázdný (null = nezadáno), stejně jako skutečnost.\nfunction syncMoneyOrNull_(value) {\n  if (value === null || value === undefined) return null;\n  return syncMoney_(value);\n}\n\n\nfunction syncId_(value) {\n  syncRequire_(typeof value === 'string' && value.length > 0 && value.length <= 256);\n  return value;\n}\n\nfunction syncUnique_(seen, id) {\n  syncId_(id);\n  syncRequire_(!seen.has(id));\n  seen.add(id);\n}\n\nfunction syncRecord_(record) {\n  syncRequire_(syncObject_(record));\n  ['createdAt', 'updatedAt'].forEach(function (field) {\n    if (record[field] !== undefined) syncRequire_(typeof record[field] === 'string' &&\n      /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/.test(record[field]) &&\n      syncDate_(record[field].slice(0, 10)) &&\n      !isNaN(Date.parse(record[field])));\n  });\n  ['del', 'archived', 'recurring', 'autoFilled'].forEach(function (field) {\n    if (record[field] !== undefined) syncRequire_(typeof record[field] === 'boolean');\n  });\n}\n\nfunction syncDay_(value) {\n  return Number.isInteger(value) && value >= 1 && value <= 31;\n}\n\nfunction syncDate_(value) {\n  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  var date = new Date(value + 'T12:00:00Z');\n  return !isNaN(date.getTime()) && date.to\u0049SOString().slice(0, 10) === value;\n}\n\nfunction syncDue_(year, month, override, fallback) {\n  if (typeof override === 'string') return override;\n  var day = override == null ? fallback : override;\n  if (day == null) return '';\n  day = Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());\n  return year + '-' + ('0' + (month + 1)).slice(-2) + '-' + ('0' + day).slice(-2);\n}\n\nfunction syncText_(value) {\n  // Název začínající = nesmí v Sheets spustit vzorec ani IMPORTXML.\n  return /^[=+@\\-\\t\\r\\n]/.test(value) ? \"'\" + value : value;\n}\n\nfunction syncOverviewRows_(doc) {\n  syncRequire_(syncObject_(doc) && doc.app === 'rozpocet' && doc.schema === 1 && syncObject_(doc.years));\n  var rows = [];\n  Object.keys(doc.years).sort().forEach(function (key) {\n    var y = doc.years[key];\n    syncRequire_(/^\\d{4}$/.test(key) && +key >= 1900 && +key <= 9999 && syncObject_(y));\n    syncRequire_(y.year === +key && Array.isArray(y.catalog) && Array.isArray(y.months) &&\n      y.months.length === 12 && Array.isArray(y.tx));\n    var catalog = new Map(), ids = new Set(), entryIds = new Set(), txIds = new Set(), totals = new Map();\n    y.catalog.forEach(function (cat) {\n      syncRecord_(cat);\n      syncUnique_(ids, cat.id);\n      syncRequire_(Object.prototype.hasOwnProperty.call(SYNC_SECTIONS, cat.sec) &&\n        typeof cat.name === 'string' && cat.name.length <= 40000 &&\n        (cat.dueDay == null || syncDay_(cat.dueDay)));\n      if (cat.goal != null) {\n        syncRequire_(cat.sec === 'savings' && syncObject_(cat.goal));\n        syncMoney_(cat.goal.target);\n        syncMoney_(cat.goal.startBalance);\n        syncRequire_(cat.goal.targetDate == null || syncDate_(cat.goal.targetDate));\n      }\n      catalog.set(cat.id, cat);\n    });\n    y.tx.forEach(function (tx) {\n      syncRecord_(tx);\n      syncUnique_(txIds, tx.id);\n      syncId_(tx.cat);\n      syncRequire_(Number.isInteger(tx.m) && tx.m >= 0 && tx.m < 12 && syncDate_(tx.d) &&\n        (tx.del == null || typeof tx.del === 'boolean'));\n      syncMoney_(tx.amt);\n      if (tx.del) return;\n      var group = tx.m + ':' + tx.cat;\n      totals.set(group, syncMoney_((totals.get(group) || 0) + tx.amt));\n    });\n    y.months.forEach(function (month, m) {\n      syncRequire_(syncObject_(month) && month.m === m && Array.isArray(month.entries));\n      month.entries.forEach(function (entry) {\n        syncRecord_(entry);\n        syncUnique_(entryIds, entry.id);\n        syncId_(entry.cat);\n        syncMoneyOrNull_(entry.plan);\n        if (entry.act !== null) syncMoney_(entry.act);\n        syncRequire_(typeof entry.paid === 'boolean' && (entry.del == null || typeof entry.del === 'boolean') &&\n          (entry.due == null || syncDay_(entry.due) || syncDate_(entry.due)) &&\n          (entry.paidAt == null || syncDate_(entry.paidAt)));\n        if (entry.del) return;\n        var cat = catalog.get(entry.cat);\n        var actual = entry.act === null ? (totals.get(m + ':' + entry.cat) || 0) : entry.act;\n        rows.push([+key, m + 1, cat ? SYNC_SECTIONS[cat.sec] : 'Nezařazeno',\n          syncText_(cat ? cat.name : 'Chybějící kategorie: ' + entry.cat),\n          entry.plan / 100, actual / 100, entry.paid ? 'Ano' : 'Ne',\n          syncDue_(+key, m, entry.due, cat ? cat.dueDay : null)]);\n      });\n    });\n  });\n  return rows;\n}\n\nfunction syncOverviewNote_(rev) {\n  return 'Odvozený přehled serverové revize ' + rev + '. Upravuj data v aplikaci.';\n}\n\nfunction syncRepairOverview_(spreadsheet, current) {\n  var sheet = spreadsheet.getSheetByName('Přehled');\n  if (!sheet && current.doc === null) return;\n  if (!sheet || sheet.getRange(1, 1).getNote() !== syncOverviewNote_(current.rev)) {\n    // I tvrdé přerušení mezi přehledem a commitem se opraví při dalším čtení.\n    syncOverview_(spreadsheet, current.doc === null ? [] : syncOverviewRows_(current.doc), current.rev);\n  }\n}\n\nfunction syncOverview_(spreadsheet, rows, rev) {\n  // Čísla zůstávají čísly pro grafy; české locale zobrazí desetinnou čárku.\n  if (spreadsheet.getSpreadsheetLocale() !== 'cs_CZ') spreadsheet.setSpreadsheetLocale('cs_CZ');\n  var sheet = spreadsheet.getSheetByName('Přehled') || spreadsheet.insertSheet('Přehled');\n  syncGrow_(sheet, rows.length + 1, 8);\n  sheet.getRange(1, 1).setNote('Probíhá obnova přehledu.');\n  SpreadsheetApp.flush(); // Značka musí přežít případné přerušení clearContents.\n  sheet.clearContents();\n  var headers = ['Rok', 'Měsíc', 'Sekce', 'Položka', 'Plán', 'Skutečnost', 'Zaplaceno', 'Splatnost'];\n  sheet.getRange(1, 1, 1, 8).setValues([headers]).setFontWeight('bold');\n  if (rows.length) {\n    sheet.getRange(2, 3, rows.length, 2).setNumberFormat('@');\n    sheet.getRange(2, 8, rows.length, 1).setNumberFormat('@');\n    sheet.getRange(2, 1, rows.length, 8).setValues(rows);\n    sheet.getRange(2, 1, rows.length, 2).setNumberFormat('0');\n    sheet.getRange(2, 5, rows.length, 2).setNumberFormat('#,##0.00 \"Kč\"');\n  }\n  sheet.setFrozenRows(1);\n  sheet.setColumnWidths(1, 2, 80);\n  sheet.setColumnWidth(3, 180);\n  sheet.setColumnWidth(4, 240);\n  sheet.setColumnWidths(5, 2, 140);\n  sheet.setColumnWidths(7, 2, 110);\n  SpreadsheetApp.flush();\n  sheet.getRange(1, 1).setNote(syncOverviewNote_(rev));\n}\n";
 
 /* ======================= 70-selftest.js ======================= */
 // 70-selftest.js — vlastní kontrola přímo v aplikaci — vlastní: L0
@@ -8528,8 +8707,12 @@ function selfTest() {
   /* --- formátování --- */
   assertEq('formát: nula', F(0), '0 Kč');
   assertEq('formát: tisíce', F(123400), '1 234 Kč');
-  assertEq('formát: -0,4 nemá minus', F(-40), '0 Kč');
-  assertEq('formát: záporné', F(-123450), '-1 235 Kč');
+  // Haléře se ukazují jen když nějaké jsou; při vynuceném zaokrouhlení na
+  // koruny nesmí vzniknout „-0 Kč".
+  assertEq('formát: -0,40 Kč se neztratí', F(-40), '-0,40 Kč');
+  assertEq('formát: zaokrouhlená nula nemá minus', F(-40, { decimals: 0 }), '0 Kč');
+  assertEq('formát: záporné s haléři', F(-123450), '-1 234,50 Kč');
+  assertEq('formát: záporné na koruny', F(-123450, { decimals: 0 }), '-1 235 Kč');
   assertEq('formát: dvě místa', F(123450, { decimals: 2 }), '1 234,50 Kč');
   assertEq('formát: miliarda', F(100000000000), '1 000 000 000 Kč');
   assertEq('formát: NaN', F(NaN), '—');
@@ -8629,10 +8812,17 @@ function selfTest() {
   /* --- chyby, které tu už jednou byly --- */
   if (typeof computeMonth === 'function' && typeof addCatalogItem === 'function') {
     // Pískoviště: vlastní rok, ať se nesahá na skutečná data.
+    // Po celou dobu je vypnuté ukládání — debounce umí vystřelit synchronně
+    // a na disku by pak zůstal rok 1900 se vším všudy.
     const zk = 1900;
+    const puvodniRok = state.activeYear;
+    const zaloha = (function () { try { return JSON.stringify(state); } catch (e) { return null; } })();
+    saveSuspended = true;
+    // Zásobník vracení se po kontrole zkrátí zpátky. Uzávěry ukazují na
+    // pískovištní rok a jedno klepnutí na „Vrátit zpět" by ho vzkřísilo.
+    const undoPred = (typeof undoPush === 'function' && undoPush.stack) ? undoPush.stack.length : null;
     try {
       state.years[String(zk)] = newYear(zk);
-      const puvodniRok = state.activeYear;
       state.activeYear = zk;
       const M = 0;
       const kPrijem = addCatalogItem({ sec: 'income', name: 'Zkouška příjem' }, 'all', zk);
@@ -8661,12 +8851,40 @@ function selfTest() {
       setPlanned(M, eDen.id, null, zk);
       assertEq('prázdný plán je null', getEntry(M, eDen.id, zk).plan, null);
 
-      state.activeYear = puvodniRok;
-      delete state.years[String(zk)];
-      invalidateAll();
+      // Smazání „v celém roce" nesmí přepsat měsíce, ve kterých už něco je.
+      const kHist = addCatalogItem({ sec: 'fixed', name: 'Zkouška historie' }, 'all', zk);
+      const e0 = ensureEntry(0, kHist.id, zk), e5 = ensureEntry(5, kHist.id, zk);
+      setPlanned(0, e0.id, 100000, zk); setActual(0, e0.id, 100000, zk);
+      setPlanned(5, e5.id, 100000, zk);
+      const ledenPred = computeMonth(zk, 0).balance;
+      removeEntry(5, e5.id, 'all', zk);
+      assertEq('smazání nepřepíše hotový měsíc', computeMonth(zk, 0).balance, ledenPred);
+      assertEq('smazaný měsíc opravdu zmizel', getEntry(5, e5.id, zk).del, true);
+
     } catch (e) {
       assertSkip('kontrola dřívějších chyb', String(e));
-      try { delete state.years[String(1900)]; invalidateAll(); } catch (e2) {}
+    } finally {
+      // Úklid proběhne i při výjimce. Nejdřív se zkusí přesná obnova ze
+      // zálohy, teprve když ta chybí, ruční návrat.
+      try {
+        if (zaloha) {
+          const puv = JSON.parse(zaloha);
+          for (const k of Object.keys(state)) delete state[k];
+          Object.assign(state, puv);
+        } else {
+          state.activeYear = puvodniRok;
+          delete state.years[String(zk)];
+        }
+      } catch (e2) {
+        state.activeYear = puvodniRok;
+        try { delete state.years[String(zk)]; } catch (e3) {}
+      }
+      if (undoPred !== null && undoPush.stack && undoPush.stack.length > undoPred) {
+        undoPush.stack.length = undoPred;
+      }
+      saveSuspended = false;
+      invalidateAll();
+      assertEq('kontrola po sobě uklidila', !state.years[String(zk)] && state.activeYear === puvodniRok, true);
     }
   } else assertSkip('kontrola dřívějších chyb', 'model není načtený');
 
@@ -8862,7 +9080,16 @@ function maybeBackupNag() {
 
 // Hlásí, že se přestalo ukládat. Pruh je trvalý a nedá se odklepnout —
 // je to nejdůležitější informace, jakou appka může mít.
-let _saveNagAt = 0;
+// Zápis se zase povedl. Pruh o chybě musí pryč; když se to podařilo až
+// po úklidu místa, řekne se to jednou nahlas.
+function saveRecovered(poUklidu) {
+  sheetBannerClear('save');
+  if (poUklidu && Date.now() - (saveRecovered.last || 0) > 60000) {
+    saveRecovered.last = Date.now();
+    toast('Došlo místo, tak jsem uklidila staré kopie. Uložilo se to. Stáhni si zálohu.', { ms: 8000 });
+  }
+}
+
 function saveProblemNotify(st) {
   const teksty = {
     quota: ['Došlo místo', 'Prohlížeč odmítl uložit další data. Stáhni si zálohu, ať o nic nepřijdeš, a smaž staré měsíce nebo ukázková data.'],
@@ -8877,7 +9104,12 @@ function saveProblemNotify(st) {
   sheetBanner({ id: 'save', kind: 'error', icon: '⚠️', title: t[0], body: t[1],
     action: TXT.backup, act: 'io.export' });
   const now = Date.now();
-  if (now - _saveNagAt > 20000) { _saveNagAt = now; toast(t[0] + ' — stáhni si zálohu.', { ms: 8000 }); }
+  // Čas posledního upozornění visí na funkci, ne na proměnné vedle ní:
+  // funkce se hoistuje, `let` ne, a volající by ji trefil v mrtvé zóně.
+  if (now - (saveProblemNotify.last || 0) > 20000) {
+    saveProblemNotify.last = now;
+    toast(t[0] + ' — stáhni si zálohu.', { ms: 8000 });
+  }
 }
 
 function registerSW() {
@@ -9029,20 +9261,34 @@ function boot() {
     const src = load.source === 'backup' ? 'Aplikace naběhla ze zálohy.'
       : load.source === 'snapshot' ? 'Aplikace naběhla z poslední uložené verze.'
       : 'Aplikace musela začít prázdná.';
-    sheetBanner({ id: 'corrupt', kind: 'warn', icon: '🛟', dismissible: true,
-      title: TXT.corruptTitle, body: TXT.corruptBody + ' ' + src,
-      action: TXT.restore, act: 'io.import' });
+    sheetBanner({ id: 'corrupt', kind: 'warn', icon: '🛟',
+      title: TXT.corruptTitle,
+      body: TXT.corruptBody + ' ' + src
+        + ' Původní soubor si můžeš stáhnout tlačítkem níž a poslat mi ho.',
+      action: 'Stáhnout poškozený soubor', act: 'io.rescue' });
   }
   if (load && load.source === 'newer') {
     sheetBanner({ id: 'newer', kind: 'error', icon: '⏭️',
       title: 'Data jsou z novější verze aplikace',
-      body: 'Nic se nepřepsalo. Otevři aplikaci na aktuální adrese, nebo načti starší zálohu.',
-      action: TXT.restore, act: 'io.import' });
+      body: 'Nic se nepřepsalo a leží to odložené stranou. Otevři aplikaci na '
+        + 'aktuální adrese, nebo si data stáhni a pošli mi je.',
+      action: 'Stáhnout data', act: 'io.rescue' });
   }
   if (state.isDemo) {
+    // Existuje-li snímek stavu před ukázkou, nabídne se návrat i po
+    // restartu. Bez toho zbylo po zavření appky jediné tlačítko: Vymazat.
+    let lzeVratit = false;
+    try {
+      lzeVratit = (typeof snapshotList === 'function') &&
+        snapshotList().some(function (x) { return x && x.ok && x.reason === 'pred-ukazkou'; });
+    } catch (e) { lzeVratit = false; }
     sheetBanner({ id: 'demo', kind: 'warn', icon: '🧪',
-      title: TXT.demoBanner, body: 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
-      action: TXT.demoWipe, act: 'demo.wipe' });
+      title: TXT.demoBanner,
+      body: lzeVratit
+        ? 'Tvoje původní data leží stranou — vrátíš je jedním klepnutím.'
+        : 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
+      action: lzeVratit ? 'Vrátit moje data' : TXT.demoWipe,
+      act: lzeVratit ? 'demo.undo' : 'demo.wipe' });
   }
 
   goScreen(state.ui && state.ui.screen ? state.ui.screen : 'month');

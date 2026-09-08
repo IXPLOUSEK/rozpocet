@@ -120,6 +120,14 @@ function _goalCatActual(yr, m, catId) {
     if (Number.isSafeInteger(en.act)) manual = (manual === null ? 0 : manual) + en.act;
   }
   if (manual !== null) return manual;
+  // Deník se počítá jen tehdy, když ta kategorie v měsíci opravdu má řádek.
+  // Bez toho by tentýž nákup byl na Měsíci „nezařazený výdaj" a na Úsporách
+  // „naspořeno" zároveň.
+  let maRadek = false;
+  if (mo && Array.isArray(mo.entries)) for (const en of mo.entries) {
+    if (!en.del && en.cat === catId) { maRadek = true; break; }
+  }
+  if (!maRadek) return 0;
   let s = 0;
   for (const t of (yr.tx || [])) {
     if (t.del || t.m !== m || t.cat !== catId) continue;

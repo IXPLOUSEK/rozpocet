@@ -218,6 +218,24 @@ function exportCSVMonth(y, m) {
       ].join(';'));
     });
   });
+  // Nezařazené nákupy a součet. Bez nich se tabulka v Excelu nedá srovnat
+  // s tím, co appka ukazuje na obrazovce.
+  let md = null;
+  try { md = computeMonth(y, m); } catch (e) { md = null; }
+  if (md && md.orphans && Number.isSafeInteger(md.orphans.total) && md.orphans.total) {
+    lines.push([escapeCsv('Nezařazeno'), escapeCsv('Nákupy bez řádku v tomhle měsíci'),
+      '', '', exportCSVMonth.num(md.orphans.total), ''].join(';'));
+  }
+  if (md) {
+    lines.push('');
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Příjmy'), '', '',
+      exportCSVMonth.num(md.incomeTotal), ''].join(';'));
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Výdaje'), '', '',
+      exportCSVMonth.num(md.outflow), ''].join(';'));
+    lines.push([escapeCsv('Souhrn'), escapeCsv('Zůstatek'), '', '',
+      exportCSVMonth.num(md.balance), ''].join(';'));
+  }
+
   // BOM první, středník, CRLF — jinak česká Excel rozseká diakritiku
   // a celý řádek nacpe do jednoho sloupce.
   const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
@@ -230,7 +248,14 @@ exportCSVMonth.rows = function (yr, m, sec, cats) {
   const mo = (yr.months || [])[m];
   return ((mo && mo.entries) || []).filter(function (e) {
     const c = e && !e.del ? cats[e.cat] : null;
-    return !!c && c.sec === sec.key && !c.archived;
+    if (!c || c.sec !== sec.key) return false;
+    if (!c.archived) return true;
+    // Archivovaná kategorie zůstává, dokud v tom měsíci něco má — stejně
+    // jako na obrazovce a v tisku.
+    return (Number.isSafeInteger(e.plan) && e.plan !== 0)
+        || (Number.isSafeInteger(e.act) && e.act !== 0)
+        || !!e.paid
+        || (yr.tx || []).some(function (t) { return t && !t.del && t.m === m && t.cat === e.cat; });
   }).sort(function (a, b) { return (cats[a.cat].order | 0) - (cats[b.cat].order | 0); });
 };
 
@@ -409,7 +434,13 @@ function applyImport(obj, mode) {
     .then(function (yes) {
       if (!yes) return { ok: false, reason: 'cancel' };
       // Snapshot PŘED záměnou — kdyby se ukázalo, že to nebyla ta pravá záloha.
-      try { snapshotSave('pred-importem', state); } catch (e) {}
+      // Snímek se dělá z toho, co je NA DISKU, ne z toho, co je v paměti.
+      // Po havarijním načtení je v paměti prázdný dokument a snímek z něj
+      // by nezachránil nic — originál přitom pořád leží v úložišti.
+      try {
+        const naDisku = storageGet(STORE_KEY);
+        snapshotSave('pred-importem', (naDisku && naDisku.length > 2) ? naDisku : state);
+      } catch (e) {}
       const clean = storageClone(obj);
       // Osiřelé nákupy se nechávají být — viz komentář ve validateImport.
       delete clean.appVersion; delete clean.exportedAt; delete clean.counts;
@@ -517,7 +548,11 @@ function renderPrintView(y, m, keepTitle) {
   // Nezařazené výdaje musí být i na papíře, jinak by tištěný zůstatek
   // nesouhlasil s tím, co appka ukazuje na obrazovce.
   let nezarazeno = 0;
-  try { const md = computeMonth(y, m); nezarazeno = (md.orphans && md.orphans.total) | 0; } catch (e) { nezarazeno = 0; }
+  try {
+    const md = computeMonth(y, m);
+    const t = md.orphans && md.orphans.total;
+    nezarazeno = Number.isSafeInteger(t) ? t : 0;   // ne |0, to přeteče nad 21 mil. Kč
+  } catch (e) { nezarazeno = 0; }
   oa += nezarazeno;
   const kpi = renderPrintView.table(['', TXT.colPlan, TXT.colActual]);
   const kb = el('tbody');
@@ -665,7 +700,22 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
     // záloha opravdu uložila, takže se před vymazáním pořídí ještě snímek
     // v úložišti. Snímky ani odložené poškozené kopie se NEMAŽOU — kdyby
     // se ukázalo, že soubor nikde není, je z čeho vrátit.
-    try { snapshotSave('pred-vymazanim', JSON.stringify(state)); } catch (e) {}
+    // Snímek se dělá jen tehdy, když je co zachraňovat. Druhé vymazání
+    // hned po prvním by jinak přepsalo dobrý snímek prázdným dokumentem
+    // a tlačítko „Přece jen vrátit" by vrátilo nic.
+    let snapKey = null, maData = false;
+    try {
+      const y0 = state.years[String(state.activeYear)];
+      maData = !!(y0 && (y0.catalog.length || y0.tx.length));
+      if (maData) snapKey = snapshotSave('pred-vymazanim', JSON.stringify(state));
+    } catch (e) { snapKey = null; }
+    // snapshotSave při plném úložišti nic nevyhodí — vrátí null. Bez téhle
+    // kontroly by se mazalo i tehdy, když záchranná kopie nevznikla.
+    if (maData && !snapKey) {
+      toast('Zálohu do paměti se nepodařilo udělat, tak jsem nic nesmazala. '
+        + 'Stáhni si zálohu do souboru a zkus to znovu.', { ms: 9000 });
+      return;
+    }
     try {
       storageRemove(STORE_KEY);
       storageRemove(BACKUP_KEY);
@@ -680,8 +730,12 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
       onAction: function () {
         // snapshotList() vrací nejnovější první; ten z vymazání je na špici.
         const snaps = (typeof snapshotList === 'function') ? snapshotList() : [];
+        // JEN snímek z tohohle vymazání. Vrátit „něco, co zbylo" a napsat
+        // u toho „Data jsou zpátky" je horší než neudělat nic — přestala by
+        // hledat skutečnou zálohu.
         const usable = snaps.filter(function (x) { return x && x.ok; });
-        const last = usable.find(function (x) { return x.reason === 'pred-vymazanim'; }) || usable[0] || null;
+        const last = (snapKey && usable.find(function (x) { return x.key === snapKey; })) || null;
+        if (!last) { toast('Není z čeho vrátit. Načti zálohu ze souboru.'); return; }
         if (!last || typeof snapshotRestore !== 'function') {
           toast('Vrátit už to nejde. Načti zálohu ze souboru.');
           return;
@@ -711,6 +765,20 @@ if (typeof window !== 'undefined' && window.addEventListener) printMonth.wire();
     },
 
     // Záloha VŽDY dřív než mazání. Bez ní se maže až po druhém vědomém ano.
+    // Poškozená data se dají dostat z appky ven. Bez tohohle byly odložené
+    // bajty vaultem bez dveří: uložily se a nikdo se k nim nedostal.
+    'io.rescue': function () {
+      const list = (typeof quarantineList === 'function') ? quarantineList() : [];
+      if (!list.length) { toast('Žádná poškozená data tu neleží.'); return; }
+      const raw = storageGet(list[0].key);
+      if (!raw) { toast('Odloženou kopii se nepodařilo přečíst.'); return; }
+      const name = 'rozpocet-poskozena-data-' + todayISO() + '.txt';
+      deliverFile(new Blob([raw], { type: 'text/plain;charset=utf-8' }), name, 'Poškozená data')
+        .then(function (res) {
+          if (!res || !res.ok) copyFallback(raw);
+        });
+    },
+
     'io.wipe': function () {
       confirmSheet({ title: TXT.wipeConfirmTitle, body: TXT.wipeConfirmBody, okLabel: TXT.wipe,
         danger: true, typeToConfirm: TXT.wipeConfirmType, typeWord: 'SMAZAT' })

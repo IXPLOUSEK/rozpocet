@@ -81,7 +81,9 @@ function ensureEntry(m, catId, y) {
   const cat = getCat(catId, y);
   if (!cat) return null;
   const e = {
-    id: uid('e_'), cat: catId, plan: 0, act: null,
+    // plan: null = nezadáno. Nula by na obrazovce tvrdila, že plán je
+    // nula korun, což není totéž jako „ještě jsem nic neplánovala".
+    id: uid('e_'), cat: catId, plan: null, act: null,
     paid: false, paidAt: null, due: null,
     autoFilled: false, del: false, updatedAt: storageStamp()
   };
@@ -296,6 +298,20 @@ function setEntryDue(m, entryId, day, y) {
   return bump(e);
 }
 
+// Má ten řádek v daném měsíci co ztratit? Stejné pravidlo jako v
+// 34-derived.js, jen bez závislosti na odvozené vrstvě.
+function _mMaData(m, e, y) {
+  if (Number.isSafeInteger(e.plan) && e.plan !== 0) return true;
+  if (Number.isSafeInteger(e.act) && e.act !== 0) return true;
+  if (e.paid) return true;
+  const yr = getYear(y);
+  for (let i = 0; i < yr.tx.length; i++) {
+    const t = yr.tx[i];
+    if (t && !t.del && t.m === m && t.cat === e.cat) return true;
+  }
+  return false;
+}
+
 // Měkce, nikdy splice. scope: 'this' | 'rest' | 'all'.
 function removeEntry(m, entryId, scope, y) {
   const e0 = getEntry(m, entryId, y);
@@ -319,6 +335,12 @@ function removeEntry(m, entryId, scope, y) {
       if (!e) continue;
       created.push({ mo: mo, e: e });
     } else if (e.del) {
+      continue;
+    } else if (i !== base && _mMaData(i, e, y)) {
+      // Měsíc, ve kterém už něco je, se NEPŘEPISUJE. „Smazat od teď dál"
+      // nebo „v celém roce" znamená přestat to sledovat, ne přepsat leden,
+      // který je hotová historie. Ten měsíc, který uživatelka smaže přímo,
+      // se smaže vždycky — to je vědomé rozhodnutí a jde vzít zpět.
       continue;
     } else {
       hidden.push(e);

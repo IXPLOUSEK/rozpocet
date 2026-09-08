@@ -113,7 +113,16 @@ function maybeBackupNag() {
 
 // Hlásí, že se přestalo ukládat. Pruh je trvalý a nedá se odklepnout —
 // je to nejdůležitější informace, jakou appka může mít.
-let _saveNagAt = 0;
+// Zápis se zase povedl. Pruh o chybě musí pryč; když se to podařilo až
+// po úklidu místa, řekne se to jednou nahlas.
+function saveRecovered(poUklidu) {
+  sheetBannerClear('save');
+  if (poUklidu && Date.now() - (saveRecovered.last || 0) > 60000) {
+    saveRecovered.last = Date.now();
+    toast('Došlo místo, tak jsem uklidila staré kopie. Uložilo se to. Stáhni si zálohu.', { ms: 8000 });
+  }
+}
+
 function saveProblemNotify(st) {
   const teksty = {
     quota: ['Došlo místo', 'Prohlížeč odmítl uložit další data. Stáhni si zálohu, ať o nic nepřijdeš, a smaž staré měsíce nebo ukázková data.'],
@@ -128,7 +137,12 @@ function saveProblemNotify(st) {
   sheetBanner({ id: 'save', kind: 'error', icon: '⚠️', title: t[0], body: t[1],
     action: TXT.backup, act: 'io.export' });
   const now = Date.now();
-  if (now - _saveNagAt > 20000) { _saveNagAt = now; toast(t[0] + ' — stáhni si zálohu.', { ms: 8000 }); }
+  // Čas posledního upozornění visí na funkci, ne na proměnné vedle ní:
+  // funkce se hoistuje, `let` ne, a volající by ji trefil v mrtvé zóně.
+  if (now - (saveProblemNotify.last || 0) > 20000) {
+    saveProblemNotify.last = now;
+    toast(t[0] + ' — stáhni si zálohu.', { ms: 8000 });
+  }
 }
 
 function registerSW() {
@@ -280,20 +294,34 @@ function boot() {
     const src = load.source === 'backup' ? 'Aplikace naběhla ze zálohy.'
       : load.source === 'snapshot' ? 'Aplikace naběhla z poslední uložené verze.'
       : 'Aplikace musela začít prázdná.';
-    sheetBanner({ id: 'corrupt', kind: 'warn', icon: '🛟', dismissible: true,
-      title: TXT.corruptTitle, body: TXT.corruptBody + ' ' + src,
-      action: TXT.restore, act: 'io.import' });
+    sheetBanner({ id: 'corrupt', kind: 'warn', icon: '🛟',
+      title: TXT.corruptTitle,
+      body: TXT.corruptBody + ' ' + src
+        + ' Původní soubor si můžeš stáhnout tlačítkem níž a poslat mi ho.',
+      action: 'Stáhnout poškozený soubor', act: 'io.rescue' });
   }
   if (load && load.source === 'newer') {
     sheetBanner({ id: 'newer', kind: 'error', icon: '⏭️',
       title: 'Data jsou z novější verze aplikace',
-      body: 'Nic se nepřepsalo. Otevři aplikaci na aktuální adrese, nebo načti starší zálohu.',
-      action: TXT.restore, act: 'io.import' });
+      body: 'Nic se nepřepsalo a leží to odložené stranou. Otevři aplikaci na '
+        + 'aktuální adrese, nebo si data stáhni a pošli mi je.',
+      action: 'Stáhnout data', act: 'io.rescue' });
   }
   if (state.isDemo) {
+    // Existuje-li snímek stavu před ukázkou, nabídne se návrat i po
+    // restartu. Bez toho zbylo po zavření appky jediné tlačítko: Vymazat.
+    let lzeVratit = false;
+    try {
+      lzeVratit = (typeof snapshotList === 'function') &&
+        snapshotList().some(function (x) { return x && x.ok && x.reason === 'pred-ukazkou'; });
+    } catch (e) { lzeVratit = false; }
     sheetBanner({ id: 'demo', kind: 'warn', icon: '🧪',
-      title: TXT.demoBanner, body: 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
-      action: TXT.demoWipe, act: 'demo.wipe' });
+      title: TXT.demoBanner,
+      body: lzeVratit
+        ? 'Tvoje původní data leží stranou — vrátíš je jedním klepnutím.'
+        : 'Až si to prohlédneš, vymaž je a začni s vlastními čísly.',
+      action: lzeVratit ? 'Vrátit moje data' : TXT.demoWipe,
+      act: lzeVratit ? 'demo.undo' : 'demo.wipe' });
   }
 
   goScreen(state.ui && state.ui.screen ? state.ui.screen : 'month');

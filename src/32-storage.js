@@ -93,9 +93,13 @@ function storageProbe() {
 }
 
 function storageGet(key) {
-  if (storageOk) {
-    const ls = storageRaw();
-    if (ls) { try { const v = ls.getItem(key); if (v !== null && v !== undefined) return v; } catch (e) { /* níž */ } }
+  // Čte se VŽDYCKY, i když zkouška zápisu selhala. Plný telefon nebo
+  // zamčené úložiště brání psaní, ne čtení — a kdyby se tu na disk nesáhlo,
+  // appka by naběhla prázdná, zatímco její data by ležela pár bajtů vedle.
+  const ls = storageRaw();
+  if (ls) {
+    try { const v = ls.getItem(key); if (v !== null && v !== undefined) return v; }
+    catch (e) { /* níž z paměti */ }
   }
   const v = storageMem.get(key);
   return v === undefined ? null : v;
@@ -382,7 +386,11 @@ const saveDebounced = debounce(function () { if (savePending) saveNow(); }, 400,
 function scheduleSave() { savePending = true; saveDebounced(); }
 
 // Synchronně, pro pagehide / beforeunload.
-function flushSave() { return savePending ? saveNow() : saveStatus; }
+function flushSave() {
+  // I když savePending zůstal viset po chybě, tohle je poslední pokus.
+  if (savePending || !saveStatus.ok) return saveNow();
+  return saveStatus;
+}
 
 // Selhání zápisu se musí dostat ven. Bez tohohle appka mlčky nic neukládá
 // a v Nastavení pořád svítí, že ukládání funguje.
@@ -394,7 +402,9 @@ function saveReport() {
 }
 
 function saveNow() {
-  savePending = false;
+  // savePending se NESHAZUJE tady. Kdyby ano, po neúspěšném zápisu by
+  // debounce ani flushSave() na pagehide už nic nezkusily — právě ve chvíli,
+  // kdy je to poslední šance.
   if (!state || typeof state !== 'object') {
     saveStatus = { ok: false, reason: 'nostate', at: Date.now(), problems: [] };
     return saveReport();
@@ -403,6 +413,12 @@ function saveNow() {
   if (loadBlocked) {
     saveStatus = { ok: false, reason: 'locked', at: Date.now(), problems: [] };
     return saveReport();
+  }
+  // Vlastní kontrola si na chvíli sahá do stavu. Po tu dobu se na disk
+  // nesmí sáhnout, jinak by tam zůstal její pískovištní rok.
+  if (typeof saveSuspended !== 'undefined' && saveSuspended) {
+    saveStatus = { ok: true, reason: 'pozastaveno', at: Date.now(), problems: [] };
+    return saveStatus;
   }
   const problems = validateDoc(state);
   if (problems.length) {
@@ -420,7 +436,10 @@ function saveNow() {
   catch (e) {
     if (saveIsQuota(e)) {
       quota = true;
-      snapshotPrune(2);                    // nejstarší snapshoty ven a jeden pokus navíc
+      // Uvolnit se má nejdřív karanténa, snímky až v krajní nouzi — jsou
+      // to jediné cesty zpátky. Dřív se z osmi nechaly dva.
+      try { quarantinePrune(1); } catch (e2) {}
+      try { storageSet(STORE_KEY, json); wrote = true; } catch (e3) { snapshotPrune(5); }
       try { storageSet(STORE_KEY, json); wrote = true; } catch (e2) { wrote = false; }
     }
   }
@@ -432,7 +451,10 @@ function saveNow() {
   // Záloha nese PŘEDCHOZÍ dobrý stav, aby jeden špatný zápis nesebral oba.
   writeBackup(prev || json);
   saveLastGood = json;
+  savePending = false;                 // teprve teď je opravdu uloženo
   saveStatus = { ok: true, reason: quota ? 'ok-po-uklidu' : 'ok', at: Date.now(), problems: [] };
+  // Povedlo se — pruh o chybě musí zmizet, jinak by strašil i po nápravě.
+  if (typeof saveRecovered === 'function') { try { saveRecovered(quota); } catch (e) {} }
   return saveStatus;
 }
 
@@ -458,6 +480,15 @@ function quarantineWrite(raw) {
       return key;
     } catch (e2) { return null; }
   }
+}
+
+// Ubere staré odložené kopie, nejnovější nechá být.
+function quarantinePrune(keep) {
+  const k = Number.isInteger(keep) && keep >= 0 ? keep : 1;
+  const list = quarantineList();
+  let removed = 0;
+  for (let i = k; i < list.length; i++) { storageRemove(list[i].key); removed += 1; }
+  return removed;
 }
 
 function quarantineList() {
@@ -490,7 +521,9 @@ function snapshotSave(reason, payload) {
   catch (e) {
     // Došlo místo. Uvolní se poškozené odložené kopie, ne snímky — ty jsou
     // často jediná cesta zpátky. Teprve když to nestačí, ubere se i ze snímků.
-    try { storageKeys(QUAR_PREFIX).forEach(function (k) { storageRemove(k); }); } catch (e2) {}
+    // Nejnovější odložená kopie zůstává vždycky — je to jediný zbytek
+    // původních bajtů. Uvolňují se jen ty starší.
+    try { quarantinePrune(1); } catch (e2) {}
     try { storageSet(key, json); }
     catch (e3) {
       snapshotPrune(3);
@@ -630,6 +663,10 @@ function loadState() {
 
   // Novější dokument z jiného zařízení: neodmigrujeme ho dozadu a ani na něj nesáhneme.
   if (first.reason === 'newer') {
+    // Dokument z novější verze je pořád platná data. Musí se odložit stranou
+    // stejně jako poškozený, jinak ho import zálohy nebo vymazání přepíše
+    // a všechno, co novější zařízení stihlo zapsat, je pryč.
+    rep.quarantineKey = quarantineWrite(String(raw));
     state = emptyDoc();
     loadBlocked = true;
     rep.ok = false; rep.source = 'newer'; rep.reason = 'newer'; rep.locked = true;

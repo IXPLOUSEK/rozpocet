@@ -198,6 +198,12 @@ function syncMoney_(value) {
   syncRequire_(Number.isSafeInteger(value) && value >= 0);
   return value;
 }
+// Plán smí být prázdný (null = nezadáno), stejně jako skutečnost.
+function syncMoneyOrNull_(value) {
+  if (value === null || value === undefined) return null;
+  return syncMoney_(value);
+}
+
 
 function syncId_(value) {
   syncRequire_(typeof value === 'string' && value.length > 0 && value.length <= 256);
@@ -286,7 +292,7 @@ function syncOverviewRows_(doc) {
         syncRecord_(entry);
         syncUnique_(entryIds, entry.id);
         syncId_(entry.cat);
-        syncMoney_(entry.plan);
+        syncMoneyOrNull_(entry.plan);
         if (entry.act !== null) syncMoney_(entry.act);
         syncRequire_(typeof entry.paid === 'boolean' && (entry.del == null || typeof entry.del === 'boolean') &&
           (entry.due == null || syncDay_(entry.due) || syncDate_(entry.due)) &&

@@ -197,8 +197,12 @@ export async function run() {
   await S.test('formatCzk: pevná mezera, žádné "-0 Kč"', () => {
     const f = need('formatCzk');
     assert.eq(f(1450000), '14 500 Kč');
-    assert.eq(f(123450), '1 235 Kč', 'zaokrouhlí se nahoru');
-    assert.eq(f(-40), '0 Kč', 'zaokrouhlená nula nesmí mít mínus');
+    // Haléře se ukazují jen když nějaké jsou — díky tomu dávají řádky
+    // dohromady přesně ten součet, který je pod nimi napsaný.
+    assert.eq(f(123450), '1 234,50 Kč', 'haléře se neschovávají');
+    assert.eq(f(123450, { decimals: 0 }), '1 235 Kč', 'vynucené koruny zaokrouhlí nahoru');
+    assert.eq(f(-40), '-0,40 Kč', 'čtyřicet haléřů není nula');
+    assert.eq(f(-40, { decimals: 0 }), '0 Kč', 'zaokrouhlená nula nesmí mít mínus');
     assert.eq(f(0), '0 Kč');
     assert.eq(f(null), '—');
     assert.eq(f(undefined), '—');
@@ -208,6 +212,8 @@ export async function run() {
     assert.eq(f(-1450000), '-14 500 Kč');
   });
 
+  // formatCzk ukazuje haléře jen když nějaké jsou. Orákulum běží na
+  // vynucených celých korunách, aby se porovnával stejný režim.
   await S.test('formatCzk: shoda s Intl na náhodných částkách', () => {
     const f = need('formatCzk');
     const nf = new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 });
@@ -216,7 +222,7 @@ export async function run() {
     const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     for (let i = 0; i < 300; i++) {
       const minor = Math.floor(rnd() * 5e8) * (rnd() < 0.2 ? -1 : 1);
-      const mine = f(minor).replace(/ /g, ' ');
+      const mine = f(minor, { decimals: 0 }).replace(/ /g, ' ');
       const theirs = nf.format(minor / 100).replace(/[  ]/g, ' ');
       // Intl si občas přehodí mezeru; porovnáváme jen číslice a znaménko.
       const norm = (s) => s.replace(/[^0-9-]/g, '');

@@ -16,11 +16,16 @@ invalidateAll.all = [txByCat, computeMonth, computeYear, computeGoals,
 
 function invalidate(y, m) {
   if (y === undefined) return invalidateAll();
-  const needle = (m === undefined) ? String(y) + ':' : String(y) + ':' + String(m) + ':';
+  // Klíč měsíčních memo je "rok:měsíc" BEZ koncové dvojtečky. S ní se
+  // neshodovalo nic a funkce tiše nemazala vůbec nic.
+  const needle = (m === undefined) ? String(y) + ':' : String(y) + ':' + String(m);
   const exact = String(y);           // computeYear a savingsSlices klíčují jen rokem
   invalidateAll.all.forEach(function (fn) {
     Array.from(fn.memo.keys()).forEach(function (k) {
-      if (k.indexOf(needle) === 0 || k === exact) fn.memo.delete(k);
+      // U konkrétního měsíce se porovnává celý klíč, aby "2026:1"
+      // neshodilo taky "2026:10", "2026:11" a "2026:12".
+      const sedi = (m === undefined) ? (k.indexOf(needle) === 0) : (k === needle);
+      if (sedi || k === exact) fn.memo.delete(k);
     });
   });
 }
@@ -58,6 +63,20 @@ function _dEntries(yr, m) {
 /* ---------- deník po kategoriích ---------- */
 
 // Živý řádek = nesmazaný záznam, jehož kategorie existuje a není archivovaná.
+// Má archivovaná kategorie v tomhle měsíci co ukazovat? Pokud ano, řádek
+// zůstává — jinak by smazání kategorie dnes přepsalo i leden, který je
+// hotová historie, a tištěný přehled by se rozešel se skutečností.
+function _dHasData(yr, m, e) {
+  if (Number.isSafeInteger(e.plan) && e.plan !== 0) return true;
+  if (Number.isSafeInteger(e.act) && e.act !== 0) return true;
+  if (e.paid) return true;
+  for (let i = 0; i < yr.tx.length; i++) {
+    const t = yr.tx[i];
+    if (t && !t.del && t.m === m && t.cat === e.cat) return true;
+  }
+  return false;
+}
+
 function _dLive(yr, m) {
   const live = new Set();
   if (!yr) return live;
@@ -65,7 +84,8 @@ function _dLive(yr, m) {
   _dEntries(yr, m).forEach(function (e) {
     if (!e || e.del) return;
     const c = cats.get(e.cat);
-    if (c && !c.archived) live.add(e.cat);
+    if (!c) return;
+    if (!c.archived || _dHasData(yr, m, e)) live.add(e.cat);
   });
   return live;
 }
@@ -114,11 +134,16 @@ function orphanTx(y, m) {
     const yr = _dYear(y);
     if (!yr) return [];
     const live = _dLive(yr, m);
+    const cats = _dCats(yr);
     const out = [];
     for (let i = 0; i < yr.tx.length; i++) {
       const t = yr.tx[i];
       if (!t || t.del || t.m !== m) continue;
       if (t.cat && live.has(t.cat)) continue;
+      // Nezařazené se sčítají do VÝDAJŮ. Zápis u příjmové kategorie by se
+      // tam dostal s obráceným znaménkem — 5 000 přijatých by ubralo 5 000.
+      const c = t.cat ? cats.get(t.cat) : null;
+      if (c && c.sec === 'income') continue;
       out.push(t);
     }
     return out;
@@ -140,21 +165,13 @@ function computeMonth(y, m) {
                           count: 0, paidCount: 0, dueCount: 0, rows: [] };
     }
 
-    // Ručně zadaná skutečnost u archivované kategorie. Řádek se nezobrazuje,
-    // ale peníze utracené byly — musí zůstat ve výdajích, jinak by smazání
-    // kategorie zvedlo zůstatek o částku, kterou uživatelka opravdu vydala.
-    let archivovaneRucne = 0;
-    _dEntries(yr, m).forEach(function (e) {
-      if (!e || e.del) return;
-      const c = cats.get(e.cat);
-      if (c && c.archived && c.sec !== 'income'
-          && Number.isSafeInteger(e.act) && e.act !== 0) archivovaneRucne += e.act;
-    });
-
     _dEntries(yr, m).forEach(function (e) {
       if (!e || e.del) return;
       const cat = cats.get(e.cat);
-      if (!cat || cat.archived) return;          // archivovaná kategorie řádek nemá
+      if (!cat) return;
+      // Archivovaná kategorie zmizí jen z měsíců, kde po ní nic nezbylo.
+      const archivovanaBezDat = cat.archived && !_dHasData(yr, m, e);
+      if (archivovanaBezDat) return;
       const sec = sections[cat.sec];
       if (!sec) return;
       const plan = Number.isSafeInteger(e.plan) ? e.plan : 0;
@@ -172,6 +189,7 @@ function computeMonth(y, m) {
         id: e.id, entry: e, cat: cat, order: cat.order | 0,
         plan: plan, act: act, txSum: txSum,
         diff: act - plan,
+        archived: !!cat.archived,
         manual: e.act !== null && e.act !== undefined,
         autoFilled: e.autoFilled === true,
         paid: e.paid === true, paidAt: e.paidAt || null,
@@ -207,7 +225,7 @@ function computeMonth(y, m) {
     // Přísná rovnost přes sekce zůstává dostupná jako outflowSections
     // a balanceSections.
     const outflowSections = outflow;
-    const nezarazeno = orphanTotal + archivovaneRucne;
+    const nezarazeno = orphanTotal;
     outflow += nezarazeno;
 
     // Nezařazené nákupy do zůstatku NEPATŘÍ: závazná rovnost zní
@@ -241,7 +259,7 @@ function computeMonth(y, m) {
       plannedBalance: plannedIncome - plannedOutflow,
       daysLeft: daysLeft,
       leftPerDay: daysLeft > 0 ? Math.trunc(balance / daysLeft) : null,
-      orphans: { count: orph.length, total: nezarazeno, txTotal: orphanTotal, manualTotal: archivovaneRucne },
+      orphans: { count: orph.length, total: nezarazeno, txTotal: orphanTotal, manualTotal: 0 },
       balanceWithOrphans: balance,
       note: (yr && yr.months[m] && typeof yr.months[m].note === 'string') ? yr.months[m].note : ''
     };

@@ -57,8 +57,12 @@ function selfTest() {
   /* --- formátování --- */
   assertEq('formát: nula', F(0), '0 Kč');
   assertEq('formát: tisíce', F(123400), '1 234 Kč');
-  assertEq('formát: -0,4 nemá minus', F(-40), '0 Kč');
-  assertEq('formát: záporné', F(-123450), '-1 235 Kč');
+  // Haléře se ukazují jen když nějaké jsou; při vynuceném zaokrouhlení na
+  // koruny nesmí vzniknout „-0 Kč".
+  assertEq('formát: -0,40 Kč se neztratí', F(-40), '-0,40 Kč');
+  assertEq('formát: zaokrouhlená nula nemá minus', F(-40, { decimals: 0 }), '0 Kč');
+  assertEq('formát: záporné s haléři', F(-123450), '-1 234,50 Kč');
+  assertEq('formát: záporné na koruny', F(-123450, { decimals: 0 }), '-1 235 Kč');
   assertEq('formát: dvě místa', F(123450, { decimals: 2 }), '1 234,50 Kč');
   assertEq('formát: miliarda', F(100000000000), '1 000 000 000 Kč');
   assertEq('formát: NaN', F(NaN), '—');
@@ -158,10 +162,17 @@ function selfTest() {
   /* --- chyby, které tu už jednou byly --- */
   if (typeof computeMonth === 'function' && typeof addCatalogItem === 'function') {
     // Pískoviště: vlastní rok, ať se nesahá na skutečná data.
+    // Po celou dobu je vypnuté ukládání — debounce umí vystřelit synchronně
+    // a na disku by pak zůstal rok 1900 se vším všudy.
     const zk = 1900;
+    const puvodniRok = state.activeYear;
+    const zaloha = (function () { try { return JSON.stringify(state); } catch (e) { return null; } })();
+    saveSuspended = true;
+    // Zásobník vracení se po kontrole zkrátí zpátky. Uzávěry ukazují na
+    // pískovištní rok a jedno klepnutí na „Vrátit zpět" by ho vzkřísilo.
+    const undoPred = (typeof undoPush === 'function' && undoPush.stack) ? undoPush.stack.length : null;
     try {
       state.years[String(zk)] = newYear(zk);
-      const puvodniRok = state.activeYear;
       state.activeYear = zk;
       const M = 0;
       const kPrijem = addCatalogItem({ sec: 'income', name: 'Zkouška příjem' }, 'all', zk);
@@ -190,12 +201,40 @@ function selfTest() {
       setPlanned(M, eDen.id, null, zk);
       assertEq('prázdný plán je null', getEntry(M, eDen.id, zk).plan, null);
 
-      state.activeYear = puvodniRok;
-      delete state.years[String(zk)];
-      invalidateAll();
+      // Smazání „v celém roce" nesmí přepsat měsíce, ve kterých už něco je.
+      const kHist = addCatalogItem({ sec: 'fixed', name: 'Zkouška historie' }, 'all', zk);
+      const e0 = ensureEntry(0, kHist.id, zk), e5 = ensureEntry(5, kHist.id, zk);
+      setPlanned(0, e0.id, 100000, zk); setActual(0, e0.id, 100000, zk);
+      setPlanned(5, e5.id, 100000, zk);
+      const ledenPred = computeMonth(zk, 0).balance;
+      removeEntry(5, e5.id, 'all', zk);
+      assertEq('smazání nepřepíše hotový měsíc', computeMonth(zk, 0).balance, ledenPred);
+      assertEq('smazaný měsíc opravdu zmizel', getEntry(5, e5.id, zk).del, true);
+
     } catch (e) {
       assertSkip('kontrola dřívějších chyb', String(e));
-      try { delete state.years[String(1900)]; invalidateAll(); } catch (e2) {}
+    } finally {
+      // Úklid proběhne i při výjimce. Nejdřív se zkusí přesná obnova ze
+      // zálohy, teprve když ta chybí, ruční návrat.
+      try {
+        if (zaloha) {
+          const puv = JSON.parse(zaloha);
+          for (const k of Object.keys(state)) delete state[k];
+          Object.assign(state, puv);
+        } else {
+          state.activeYear = puvodniRok;
+          delete state.years[String(zk)];
+        }
+      } catch (e2) {
+        state.activeYear = puvodniRok;
+        try { delete state.years[String(zk)]; } catch (e3) {}
+      }
+      if (undoPred !== null && undoPush.stack && undoPush.stack.length > undoPred) {
+        undoPush.stack.length = undoPred;
+      }
+      saveSuspended = false;
+      invalidateAll();
+      assertEq('kontrola po sobě uklidila', !state.years[String(zk)] && state.activeYear === puvodniRok, true);
     }
   } else assertSkip('kontrola dřívějších chyb', 'model není načtený');
 

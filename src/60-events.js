@@ -89,8 +89,15 @@ function patchTabBadges() {
   if (!badge) return;
   let n = 0;
   try {
-    const due = computeDue(state.activeYear, state.ui.month, state.settings.dueSoonDays);
-    n = due.overdue.length + due.soon.length;
+    // Stejný zdroj jako panel plateb, jinak zvonek hlásí jiné číslo, než
+    // co se pod ním po klepnutí objeví — a svítí i u minulých měsíců.
+    if (typeof dueList === 'function') {
+      const d = dueList(state.activeYear, state.ui.month, state.settings.dueSoonDays);
+      n = d.overdue.length + d.soon.length;
+    } else {
+      const due = computeDue(state.activeYear, state.ui.month, state.settings.dueSoonDays);
+      n = due.overdue.length + due.soon.length;
+    }
   } catch (e) { n = 0; }
   setText(badge, String(n));
   badge.hidden = n === 0;
