@@ -51,6 +51,10 @@ const BENIGN = [
   /favicon\.ico/i,
   /Failed to load resource.*favicon/i,
   /ServiceWorker.*(unsupported|not supported)/i,
+  // Safari nezná viewport klíč interactive-widget a napíše si o tom do
+  // konzole. Je to upozornění prohlížeče na funkci, kterou neumí, ne chyba
+  // aplikace — a v prohlížečích, které ji umí, drží pole nad klávesnicí.
+  /Viewport argument key "interactive-widget" not recognized/i,
 ];
 
 /**
