@@ -570,10 +570,10 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
         if (!secDef) return;
         inputSheet({
           title: secDef.addLabel, label: 'Název položky', required: true,
-          placeholder: 'Třeba Nájem', okLabel: 'Pokračovat',
+          placeholder: secDef.hint || 'Třeba Nájem', okLabel: 'Pokračovat',
         }).then(function (name) {
           if (!name) return;
-          askScope('Jak často „' + name + '" platíš?', '').then(function (scope) {
+          askScope('Jak často „' + name + '" ' + (secDef.verb || 'platíš') + '?', '').then(function (scope) {
             if (!scope) return;
             addCatalogItem({ sec: secDef.key, name: name, icon: SEC_ICON[secDef.key] || '•' }, scope);
             renderApp();

@@ -129,6 +129,31 @@ if (sheetOpen === 1) {
 await page.evaluate(() => { const b = document.querySelector('.sheet-close'); if (b) b.click(); });
 await page.waitForTimeout(300);
 
+// --- příklad v poli musí sedět k sekci ---
+await page.click('#tabbar .tab[data-screen="month"]');
+await page.waitForTimeout(400);
+{
+  const ocekavane = { income: /Výplata/, fixed: /Nájem/, daily: /Jídlo/,
+                      savings: /Dovolená/, debt: /Půjčka/, subs: /Netflix/ };
+  const videne = [];
+  for (const sec of Object.keys(ocekavane)) {
+    const btn = page.locator(`#screen-month .sec-card[data-sec="${sec}"] .sec-add`).first();
+    if (!(await btn.count())) { videne.push(sec + ':bez tlačítka'); continue; }
+    await btn.click();
+    await page.waitForTimeout(350);
+    const ph = await page.evaluate(() => {
+      const i = document.querySelector('#sheet-host input');
+      return i ? (i.getAttribute('placeholder') || '') : null;
+    });
+    videne.push(sec + ':' + ph);
+    ok('příklad u „' + sec + '" sedí k sekci', ph && ocekavane[sec].test(ph), String(ph));
+    await page.evaluate(() => { const b = document.querySelector('.sheet-close'); if (b) b.click(); });
+    await page.waitForTimeout(300);
+  }
+  const unikatni = new Set(videne.map(v => v.split(':')[1]));
+  ok('každá sekce má svůj příklad', unikatni.size === videne.length, videne.join(' | '));
+}
+
 // --- záloha se dá vyrobit a je neprázdná ---
 const exp = await page.evaluate(() => {
   try {

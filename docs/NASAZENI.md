@@ -6,6 +6,28 @@ Aplikace funguje jako tzv. PWA (progresivní webová aplikace) – to znamená, 
 
 ---
 
+## Nejrychlejší cesta: jeden příkaz
+
+Když máš terminál, nemusíš klikat vůbec. `gh` (oficiální nástroj GitHubu)
+je už nainstalovaný v `~/.local/bin/gh`.
+
+```bash
+gh auth login                 # jednou; vyber GitHub.com → HTTPS → přihlásit přes prohlížeč
+cd ~/Downloads/nikola\ sporici\ app
+./tools/deploy.sh             # založí repozitář, nahraje appku, zapne Pages
+```
+
+Skript na konci vypíše adresu ve tvaru `https://tvojejmeno.github.io/rozpocet/`.
+Chceš jiný název repozitáře? Předej ho jako argument: `./tools/deploy.sh penize`.
+
+Když budeš appku aktualizovat, spusť `./tools/deploy.sh` znovu. Nic víc.
+Ona pak musí aplikaci na iPhonu jednou úplně zavřít a otevřít, aby se
+načetla nová verze.
+
+Pokud terminál používat nechceš, pokračuj klikací cestou níž.
+
+---
+
 ## Co budeš nahrávat
 
 Oba soubory najdeš ve složce projektu, v podsložce `dist/`:

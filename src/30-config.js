@@ -29,13 +29,22 @@ const SNAP_PREFIX = 'rozpocet:snap:';
 const QUAR_PREFIX = 'rozpocet:quarantine:';
 const NBSP = ' ';
 
+// `hint` je příklad v prázdném poli. Musí odpovídat sekci — „Třeba Nájem"
+// u přidávání příjmu člověka jen zmate. `verb` drží stejnou logiku ve větě
+// o tom, jak často se to opakuje: příjem se nedostává „placením".
 const SECTIONS = Object.freeze([
-  { key: 'income',  label: 'PŘÍJMY',            short: 'Příjmy',     dir:  1, hasDue: false, hasGoal: false, addLabel: 'Přidat příjem' },
-  { key: 'fixed',   label: 'FIXNÍ NÁKLADY',     short: 'Fixní',      dir: -1, hasDue: true,  hasGoal: false, addLabel: 'Přidat fixní náklad' },
-  { key: 'daily',   label: 'KAŽDODENNÍ VÝDAJE', short: 'Každodenní', dir: -1, hasDue: false, hasGoal: false, addLabel: 'Přidat výdaj' },
-  { key: 'savings', label: 'ÚSPORY',            short: 'Úspory',     dir: -1, hasDue: false, hasGoal: true,  addLabel: 'Přidat úsporu' },
-  { key: 'debt',    label: 'DLUH',              short: 'Dluh',       dir: -1, hasDue: true,  hasGoal: false, addLabel: 'Přidat dluh' },
-  { key: 'subs',    label: 'PŘEDPLATNÉ',        short: 'Předplatné', dir: -1, hasDue: true,  hasGoal: false, addLabel: 'Přidat předplatné' },
+  { key: 'income',  label: 'PŘÍJMY',            short: 'Příjmy',     dir:  1, hasDue: false, hasGoal: false,
+    addLabel: 'Přidat příjem',         hint: 'Třeba Výplata nebo Brigáda',   verb: 'dostáváš' },
+  { key: 'fixed',   label: 'FIXNÍ NÁKLADY',     short: 'Fixní',      dir: -1, hasDue: true,  hasGoal: false,
+    addLabel: 'Přidat fixní náklad',   hint: 'Třeba Nájem nebo Internet',    verb: 'platíš' },
+  { key: 'daily',   label: 'KAŽDODENNÍ VÝDAJE', short: 'Každodenní', dir: -1, hasDue: false, hasGoal: false,
+    addLabel: 'Přidat výdaj',          hint: 'Třeba Jídlo nebo Kafe',        verb: 'utrácíš za' },
+  { key: 'savings', label: 'ÚSPORY',            short: 'Úspory',     dir: -1, hasDue: false, hasGoal: true,
+    addLabel: 'Přidat úsporu',         hint: 'Třeba Dovolená nebo Rezerva',  verb: 'odkládáš na' },
+  { key: 'debt',    label: 'DLUH',              short: 'Dluh',       dir: -1, hasDue: true,  hasGoal: false,
+    addLabel: 'Přidat dluh',           hint: 'Třeba Půjčka nebo Kreditka',   verb: 'splácíš' },
+  { key: 'subs',    label: 'PŘEDPLATNÉ',        short: 'Předplatné', dir: -1, hasDue: true,  hasGoal: false,
+    addLabel: 'Přidat předplatné',     hint: 'Třeba Netflix nebo Spotify',   verb: 'platíš' },
 ]);
 const SECTION_BY_KEY = Object.freeze(Object.fromEntries(SECTIONS.map(s => [s.key, s])));
 
