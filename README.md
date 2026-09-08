@@ -25,6 +25,25 @@ Tabulkách.
 > webovou adresu a ona si ji přidá na plochu. Přidání na plochu zároveň brání
 > tomu, aby Safari po sedmi dnech nepoužívání data smazalo.
 
+## Soukromí
+
+Data jsou v prohlížeči toho zařízení, kde se zapsala, a nikam neodcházejí.
+Na hostingu leží jen program. Ověřuje to `node tools/soukromi.mjs`, který
+proti nasazené adrese zkontroluje, že si dvě různá zařízení navzájem do dat
+nevidí, že na serveru žádná data nejsou, a že appka za celou relaci neudělá
+jediné volání mimo vlastní doménu.
+
+**Cookies se schválně nepoužívají.** Cookie se posílá na server při každém
+požadavku, takže by data ze zařízení odcházela. `localStorage` se neposílá
+nikdy. Je to tedy o stupeň lepší, ne horší.
+
+Jedno omezení stojí za vědomí: GitHub Pages dává všem projektům jednoho účtu
+stejnou doménu `<jmeno>.github.io`. Kdyby na ní vznikl další web, technicky
+by na cizím zařízení mohl číst stejné úložiště — ale jen tehdy, kdyby ho
+uživatelka na svém telefonu otevřela. Kdo tohle chce vyloučit úplně, nasadí
+appku na doménu, kterou nic jiného nesdílí (Cloudflare Pages dává každému
+projektu vlastní `<projekt>.pages.dev`).
+
 ## Vývoj
 
 Aplikace se skládá z fragmentů v `src/`, aby na ní mohlo pracovat víc lidí

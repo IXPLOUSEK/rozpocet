@@ -7667,7 +7667,23 @@ function renderSettingsScreen() {
   btn(db, 'Načíst ukázková data', 'demo.load');
   btn(db, TXT.wipe, 'io.wipe', 'btn-danger');
 
-  /* --- 7. O aplikaci --- */
+  /* --- 7. Soukromí --- */
+  // Musí to být napsané v appce, ne jen v návodu. Kdo si to má přečíst,
+  // ten se do README nepodívá.
+  const priv = card('Soukromí');
+  say(priv, 'Tvoje čísla jsou jen tvoje. Leží v tomhle telefonu, v téhle aplikaci, a nikam se neposílají.');
+  const pl = el('ul', { class: 'set-list' });
+  [
+    'Kdo ti aplikaci poslal, do tvých čísel nevidí. Na svém telefonu má vlastní prázdnou kopii.',
+    'Na internetu je uložený jen samotný program, ne tvoje data.',
+    'Žádný účet, žádné přihlašování, žádné cookies, žádné sledování.',
+    'Jediné, co data někam přenese, je záloha, kterou si sama stáhneš. Pak je jen tam, kam si ji uložíš.',
+    'Když telefon půjčíš, uvidí to, co je na obrazovce. Zamykej si ho jako obvykle.',
+  ].forEach(function (t) { pl.appendChild(el('li', null, t)); });
+  priv.appendChild(pl);
+  slot(priv, 'privacy-sync');
+
+  /* --- 8. O aplikaci --- */
   const about = card('O aplikaci');
   say(about, 'Rozpočet ' + APP_VERSION);
   slot(about, 'storage-state');
@@ -7682,6 +7698,19 @@ function renderSettingsScreen() {
 function patchSettings() {
   const host = qs('#screen-more.is-active');
   if (!host) return;
+
+  /* --- soukromí: stav synchronizace se musí říct pravdivě --- */
+  const ps = qs('[data-d="privacy-sync"]', host);
+  if (ps) {
+    const url = (state.settings && state.settings.syncUrl) || '';
+    setText(ps, url
+      ? '⚠️ Synchronizace je zapnutá. Kopie tvých dat leží v Google Tabulce na účtu, '
+        + 'jehož adresu jsi vložila. Kdo zná adresu i heslo, může je číst i přepsat. '
+        + 'Vypnout se dá v části Synchronizace.'
+      : '✅ Synchronizace je vypnutá. Z tohohle telefonu neodchází žádná data.');
+    ps.classList.toggle('is-warn', !!url);
+    ps.classList.toggle('is-pos', !url);
+  }
 
   /* --- instalace --- */
   const on = detectStandalone();

@@ -100,6 +100,21 @@ Přehled měsíce si můžeš kdykoliv vytisknout nebo uložit:
 
 ---
 
+### 9b. Kdo vidí tvoje čísla
+
+Nikdo kromě tebe.
+
+Všechno, co si sem zapíšeš, zůstává v tomhle telefonu, v téhle aplikaci. Nikam se to neposílá a nikde to není uložené na internetu. Na internetu leží jen samotný program, tedy prázdná aplikace, kterou si každý stáhne k sobě.
+
+- Ten, kdo ti aplikaci poslal, do tvých čísel nevidí. Když si ji otevře u sebe, má vlastní prázdnou kopii.
+- Nikde se nepřihlašuješ, nezakládá se žádný účet, nic tě nesleduje.
+- Když si stáhneš zálohu, ten soubor je pak jen tam, kam si ho uložíš. Nikam sám neodchází.
+- Když někomu půjčíš odemčený telefon, uvidí to, co je zrovna na obrazovce. Zamykej si ho jako obvykle.
+
+Chceš si to ověřit? V záložce „Víc" je část **Soukromí**, kde je totéž napsané přímo v aplikaci, včetně toho, jestli je zapnutá synchronizace. Ve výchozím stavu vypnutá je.
+
+---
+
 ### 10. Když se něco pokazí
 - **Aplikace vypadá prázdná nebo se ti zdá, že něco nesedí?** Nic není ztraceno, stačí načíst poslední staženou zálohu podle bodu 8.
 - **Nevíš si s něčím rady?** Kdykoliv si nebudeš jistá, stačí mi napsat nebo zavolat a společně to hned vyřešíme.
