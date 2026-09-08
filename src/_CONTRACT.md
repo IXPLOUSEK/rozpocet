@@ -21,7 +21,7 @@ Sdílí tedy jeden lexikální scope. Kolize jmen = rozbitá appka.
 | Fragment | Smí deklarovat prefix / jména |
 |---|---|
 | `30-config.js` | `SECTIONS SECTION_BY_KEY MONTHS_NOM MONTHS_GEN MONTHS_SHORT DAYS_SHORT TXT SCHEMA STORE_KEY BACKUP_KEY SNAP_PREFIX QUAR_PREFIX DEFAULT_CATALOG NBSP APP_VERSION` |
-| `31-util.js` | `uid num clamp parseCzkInput formatCzk formatSigned fmtEdit pct monthKey ymd todayISO parseYmd daysInMonth dueDateFor isInMonth addMonths monthLabelCs monthShortCs fmtDateShort fmtDateLong daysBetween daysUntil relDaysCs cmpCs debounce rafOnce el svgEl qs qsa tpl setText setAttrIf setBarWidth escapeCsv deepEqual roundMinor sumMinor` |
+| `31-util.js` | `uid num clamp parseCzkInput formatCzk formatCzkRound formatSigned formatSignedRound fmtEdit pct monthKey ymd todayISO parseYmd daysInMonth dueDateFor isInMonth addMonths monthLabelCs monthShortCs fmtDateShort fmtDateLong daysBetween daysUntil relDaysCs cmpCs debounce rafOnce el svgEl qs qsa tpl setText setAttrIf setBarWidth escapeCsv deepEqual roundMinor sumMinor` |
 | `32-storage.js` | `storage*` `save*` `load*` `snapshot*` `quarantine*` `migrate` `MIGRATIONS` `emptyDoc` `newYear` |
 | `33-model.js` | `state` `_mMaData` `getYear getMonthObj getCat getEntry ensureEntry ensureMonth addCatalogItem updateCatalogItem archiveCatalogItem setPlanned setActual clearActual togglePaid setEntryDue removeEntry reorderSection addTx updateTx removeTx setGoal setSetting bump undoPush undoLast` |
 | `34-derived.js` | `txByCat effActual computeMonth computeYear computeGoals computeDue dailySlices savingsSlices invalidate invalidateAll orphanTx` |

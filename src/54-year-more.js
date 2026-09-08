@@ -221,9 +221,9 @@ function patchYear() {
     setText(box.querySelector('[data-d="hint"]'), hintTxt);
     return v;
   };
-  kpi('income', formatCzk(inc.total.act), 'plán ' + formatCzk(inc.total.plan));
-  kpi('outflow', formatCzk(out.total.act), 'plán ' + formatCzk(out.total.plan));
-  const bv = kpi('balance', formatSigned(bal.total.act), 'plán ' + formatSigned(bal.total.plan));
+  kpi('income', formatCzkRound(inc.total.act), 'plán ' + formatCzkRound(inc.total.plan));
+  kpi('outflow', formatCzkRound(out.total.act), 'plán ' + formatCzkRound(out.total.plan));
+  const bv = kpi('balance', formatSignedRound(bal.total.act), 'plán ' + formatSignedRound(bal.total.plan));
   if (bv) {
     bv.classList.toggle('is-pos', bal.total.act > 0);
     bv.classList.toggle('is-neg', bal.total.act < 0);

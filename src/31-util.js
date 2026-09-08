@@ -143,7 +143,15 @@ function formatCzk(minor, opts) {
   return sign + body + NBSP + 'Kč';
 }
 
-function formatSigned(minor) { return formatCzk(minor, { sign: true }); }
+function formatSigned(minor, opts) {
+  const o = opts || {};
+  return formatCzk(minor, { sign: true, decimals: o.decimals });
+}
+
+// Souhrnná čísla nahoře na obrazovce: vždy celé koruny. Haléře v nadpisu
+// jsou šum a dlouhé číslo se do dlaždice nevejde.
+function formatCzkRound(minor) { return formatCzk(minor, { decimals: 0 }); }
+function formatSignedRound(minor) { return formatCzk(minor, { sign: true, decimals: 0 }); }
 
 // Podoba pro editaci: holé číslo, česká čárka, bez oddělovačů a bez "Kč".
 function fmtEdit(minor) {

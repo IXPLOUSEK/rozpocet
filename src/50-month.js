@@ -254,8 +254,8 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
       return k;
     };
 
-    setKpi('income', formatCzk(incomeOf(data)), '');
-    setKpi('expense', formatCzk(num(data.outflow)), '');
+    setKpi('income', formatCzkRound(incomeOf(data)), '');
+    setKpi('expense', formatCzkRound(num(data.outflow)), '');
 
     // Hrdina: znaménko slovy i barvou. Nápověda jen v běžícím měsíci —
     // „na den do konce měsíce" u dubna v září nedává smysl.
@@ -265,9 +265,9 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
     const bal = balOk ? data.balance : NaN;
     let hint = '';
     if (isCurrentMonth(y, m) && Number.isSafeInteger(data.leftPerDay)) {
-      hint = formatCzk(data.leftPerDay) + ' ' + TXT.kpiLeftHint;
+      hint = formatCzkRound(data.leftPerDay) + ' ' + TXT.kpiLeftHint;
     }
-    const hero = setKpi('left', formatSigned(bal), hint);
+    const hero = setKpi('left', formatSignedRound(bal), hint);
     if (hero) {
       const v = hero.querySelector('[data-d="value"]');
       v.classList.toggle('is-pos', bal >= 0);
