@@ -1920,7 +1920,15 @@ function formatCzk(minor, opts) {
   return sign + body + NBSP + 'Kč';
 }
 
-function formatSigned(minor) { return formatCzk(minor, { sign: true }); }
+function formatSigned(minor, opts) {
+  const o = opts || {};
+  return formatCzk(minor, { sign: true, decimals: o.decimals });
+}
+
+// Souhrnná čísla nahoře na obrazovce: vždy celé koruny. Haléře v nadpisu
+// jsou šum a dlouhé číslo se do dlaždice nevejde.
+function formatCzkRound(minor) { return formatCzk(minor, { decimals: 0 }); }
+function formatSignedRound(minor) { return formatCzk(minor, { sign: true, decimals: 0 }); }
 
 // Podoba pro editaci: holé číslo, česká čárka, bez oddělovačů a bez "Kč".
 function fmtEdit(minor) {
@@ -4971,8 +4979,8 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
       return k;
     };
 
-    setKpi('income', formatCzk(incomeOf(data)), '');
-    setKpi('expense', formatCzk(num(data.outflow)), '');
+    setKpi('income', formatCzkRound(incomeOf(data)), '');
+    setKpi('expense', formatCzkRound(num(data.outflow)), '');
 
     // Hrdina: znaménko slovy i barvou. Nápověda jen v běžícím měsíci —
     // „na den do konce měsíce" u dubna v září nedává smysl.
@@ -4982,9 +4990,9 @@ const rowIndex = new Map();   // id POLOŽKY -> uzel .row
     const bal = balOk ? data.balance : NaN;
     let hint = '';
     if (isCurrentMonth(y, m) && Number.isSafeInteger(data.leftPerDay)) {
-      hint = formatCzk(data.leftPerDay) + ' ' + TXT.kpiLeftHint;
+      hint = formatCzkRound(data.leftPerDay) + ' ' + TXT.kpiLeftHint;
     }
-    const hero = setKpi('left', formatSigned(bal), hint);
+    const hero = setKpi('left', formatSignedRound(bal), hint);
     if (hero) {
       const v = hero.querySelector('[data-d="value"]');
       v.classList.toggle('is-pos', bal >= 0);
@@ -7435,9 +7443,9 @@ function patchYear() {
     setText(box.querySelector('[data-d="hint"]'), hintTxt);
     return v;
   };
-  kpi('income', formatCzk(inc.total.act), 'plán ' + formatCzk(inc.total.plan));
-  kpi('outflow', formatCzk(out.total.act), 'plán ' + formatCzk(out.total.plan));
-  const bv = kpi('balance', formatSigned(bal.total.act), 'plán ' + formatSigned(bal.total.plan));
+  kpi('income', formatCzkRound(inc.total.act), 'plán ' + formatCzkRound(inc.total.plan));
+  kpi('outflow', formatCzkRound(out.total.act), 'plán ' + formatCzkRound(out.total.plan));
+  const bv = kpi('balance', formatSignedRound(bal.total.act), 'plán ' + formatSignedRound(bal.total.plan));
   if (bv) {
     bv.classList.toggle('is-pos', bal.total.act > 0);
     bv.classList.toggle('is-neg', bal.total.act < 0);
