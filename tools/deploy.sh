@@ -39,6 +39,11 @@ else
 fi
 "$GH" auth setup-git >/dev/null 2>&1 || true
 
+# Bez identity git odmítne commitnout. Nastaví se jen pro tenhle repozitář.
+git config user.email >/dev/null 2>&1 || git config user.email "$("$GH" api user --jq '.email // empty')"
+git config user.email >/dev/null 2>&1 || git config user.email "$USER@users.noreply.github.com"
+git config user.name  >/dev/null 2>&1 || git config user.name  "$USER"
+
 echo "4) zdrojové soubory na větev main"
 git add -A
 git diff --cached --quiet || git commit -q -m "Aktualizace před nasazením"

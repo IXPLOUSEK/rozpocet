@@ -516,3 +516,17 @@ textarea { font-size: 16px; }
   border: 1px solid var(--meter-edge, var(--ink-3));
   box-sizing: border-box;
 }
+
+/* Seznam v nastavení (soukromí, kroky instalace). Bez odrážek splyne
+   v jeden odstavec a nedá se to přelétnout očima. */
+.set-list {
+  margin: var(--sp-3) 0 0;
+  padding-inline-start: var(--sp-5);
+  color: var(--ink-2);
+  list-style: disc;
+}
+.set-list li {
+  margin-block: var(--sp-3);
+  line-height: var(--lh);
+}
+.set-list li::marker { color: var(--accent-text); }

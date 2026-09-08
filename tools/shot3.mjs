@@ -15,6 +15,10 @@ const ctx=await b.newContext({...pw.devices['iPhone 15'],locale:'cs-CZ',timezone
 const p=await ctx.newPage();
 await p.goto(URL_,{waitUntil:'load',timeout:45000});
 await p.waitForTimeout(1500);
+// Na čistém profilu je otevřený uvítací panel a překrývá spodní lištu.
+await p.evaluate(()=>{ const b=document.querySelector('#sheet-host .btn-primary')
+  || document.querySelector('.sheet-close'); if (b) b.click(); });
+await p.waitForTimeout(800);
 await p.click('#tabbar .tab[data-screen="more"]');
 await p.waitForTimeout(600);
 const card = p.locator('#screen-more .card', { hasText: 'Soukromí' }).first();
