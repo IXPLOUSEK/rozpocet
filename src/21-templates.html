@@ -1,0 +1,200 @@
+<!-- 21-templates.html — jediný zdroj nových uzlů. Nikde innerHTML. -->
+
+<template id="tpl-kpi">
+  <div class="kpi">
+    <span class="kpi-label" data-d="label"></span>
+    <span class="kpi-value" data-d="value"></span>
+    <span class="kpi-hint" data-d="hint"></span>
+  </div>
+</template>
+
+<template id="tpl-alert-card">
+  <button class="alert-card" data-act="due.open">
+    <span class="alert-ico" aria-hidden="true">📅</span>
+    <span class="alert-body">
+      <span class="alert-title" data-d="title"></span>
+      <span class="alert-sub" data-d="sub"></span>
+    </span>
+    <span class="alert-chevron" aria-hidden="true">›</span>
+  </button>
+</template>
+
+<template id="tpl-section-card">
+  <section class="card sec-card" data-sec="">
+    <header class="sec-head">
+      <button class="sec-toggle" data-act="sec.toggle" aria-expanded="true">
+        <span class="sec-title" data-d="title"></span>
+        <span class="sec-chevron" aria-hidden="true">⌃</span>
+      </button>
+      <div class="sec-sums">
+        <span class="sec-sum"><span class="sec-sum-lbl">Plán</span><span class="sec-sum-val" data-d="plan"></span></span>
+        <span class="sec-sum"><span class="sec-sum-lbl">Skutečnost</span><span class="sec-sum-val is-strong" data-d="act"></span></span>
+        <span class="sec-sum"><span class="sec-sum-lbl">Rozdíl</span><span class="sec-sum-val" data-d="diff"></span></span>
+      </div>
+      <div class="sec-bars" aria-hidden="true">
+        <span class="minibar minibar-plan"><i data-d="barplan"></i></span>
+        <span class="minibar minibar-act"><i data-d="baract"></i></span>
+      </div>
+    </header>
+    <div class="sec-rows" data-d="rows"></div>
+    <button class="sec-add" data-act="row.add"><span aria-hidden="true">+</span> <span data-d="addlabel"></span></button>
+  </section>
+</template>
+
+<template id="tpl-row">
+  <div class="row" data-id="">
+    <button class="row-main" data-act="row.open">
+      <span class="row-ico" data-d="icon" aria-hidden="true"></span>
+      <span class="row-text">
+        <span class="row-name" data-d="name"></span>
+        <span class="row-sub" data-d="sub"></span>
+      </span>
+    </button>
+    <label class="cell cell-plan">
+      <span class="sr-only" data-d="a11yplan">Plán</span>
+      <input class="amt" data-f="plan" type="text" inputmode="decimal" enterkeyhint="next"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="amt-display" data-d="plan" aria-hidden="true"></span>
+    </label>
+    <label class="cell cell-act">
+      <span class="sr-only" data-d="a11yact">Skutečnost</span>
+      <input class="amt" data-f="act" type="text" inputmode="decimal" enterkeyhint="done"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="amt-display" data-d="act" aria-hidden="true"></span>
+    </label>
+    <button class="row-paid" data-act="row.paid" aria-pressed="false" aria-label="Zaplaceno" hidden>
+      <span aria-hidden="true">✓</span>
+    </button>
+    <div class="row-goal" data-d="goalwrap" hidden>
+      <span class="goalbar"><i data-d="goalbar"></i></span>
+      <span class="goal-text" data-d="goaltext"></span>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-month-chip">
+  <button class="chip-month" data-act="month.go" data-m="">
+    <span class="chip-lbl" data-d="label"></span>
+    <span class="chip-bar" data-d="bar" aria-hidden="true"></span>
+  </button>
+</template>
+
+<template id="tpl-empty">
+  <p class="empty" data-d="text"></p>
+</template>
+
+<template id="tpl-tx-item">
+  <button class="tx" data-id="" data-act="tx.open">
+    <span class="tx-ico" data-d="icon" aria-hidden="true"></span>
+    <span class="tx-body">
+      <span class="tx-name" data-d="name"></span>
+      <span class="tx-note" data-d="note"></span>
+    </span>
+    <span class="tx-amt" data-d="amt"></span>
+  </button>
+</template>
+
+<template id="tpl-tx-day">
+  <div class="tx-day">
+    <div class="tx-day-head">
+      <span class="tx-day-label" data-d="label"></span>
+      <span class="tx-day-sum" data-d="sum"></span>
+    </div>
+    <div class="tx-day-list" data-d="list"></div>
+  </div>
+</template>
+
+<template id="tpl-chip">
+  <button class="chip" data-act="" data-val="">
+    <span data-d="label"></span>
+  </button>
+</template>
+
+<template id="tpl-year-row">
+  <button class="yrow" data-act="month.go" data-m="">
+    <span class="yrow-month" data-d="month"></span>
+    <span class="yrow-bars" aria-hidden="true">
+      <span class="ybar ybar-plan"><i data-d="barplan"></i></span>
+      <span class="ybar ybar-act"><i data-d="baract"></i></span>
+    </span>
+    <span class="yrow-vals">
+      <span class="yrow-plan" data-d="plan"></span>
+      <span class="yrow-act" data-d="act"></span>
+    </span>
+    <span class="yrow-dot" data-d="dot" hidden aria-hidden="true"></span>
+  </button>
+</template>
+
+<template id="tpl-goal-card">
+  <article class="card goal-card" data-id="">
+    <header class="goal-head">
+      <span class="goal-ico" data-d="icon" aria-hidden="true"></span>
+      <h3 class="goal-name" data-d="name"></h3>
+      <button class="goal-edit" data-act="goal.edit" aria-label="Upravit cíl">Upravit</button>
+    </header>
+    <p class="goal-amount"><span data-d="saved"></span><span class="goal-of"> z </span><span data-d="target"></span></p>
+    <span class="goalbar goalbar-lg"><i data-d="bar"></i></span>
+    <p class="goal-meta"><span data-d="left"></span><span class="goal-sep" data-d="sepvis"> · </span><span data-d="pace"></span></p>
+    <div class="goal-months" data-d="months" aria-hidden="true"></div>
+  </article>
+</template>
+
+<template id="tpl-due-item">
+  <div class="due-item" data-id="">
+    <button class="due-check" data-act="due.toggle" aria-pressed="false" aria-label="Označit jako zaplacené">
+      <span aria-hidden="true">✓</span>
+    </button>
+    <span class="due-body">
+      <span class="due-name" data-d="name"></span>
+      <span class="due-when" data-d="when"></span>
+    </span>
+    <span class="due-amt" data-d="amt"></span>
+  </div>
+</template>
+
+<template id="tpl-sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <h2 class="sheet-title" id="sheet-title" data-d="title"></h2>
+      <button class="sheet-close" data-act="sheet.close" aria-label="Zavřít">✕</button>
+    </header>
+    <div class="sheet-body" data-d="body"></div>
+    <footer class="sheet-foot" data-d="foot"></footer>
+  </div>
+</template>
+
+<template id="tpl-field">
+  <label class="field">
+    <span class="field-label" data-d="label"></span>
+    <input class="field-input" data-f="" type="text" autocomplete="off">
+    <span class="field-hint" data-d="hint"></span>
+  </label>
+</template>
+
+<template id="tpl-banner">
+  <div class="banner" role="status">
+    <span class="banner-ico" data-d="icon" aria-hidden="true"></span>
+    <span class="banner-text">
+      <span class="banner-title" data-d="title"></span>
+      <span class="banner-body" data-d="body"></span>
+    </span>
+    <button class="banner-action" data-act="" data-d="action" hidden></button>
+    <button class="banner-close" data-act="banner.dismiss" aria-label="Zavřít" hidden>✕</button>
+  </div>
+</template>
+
+<template id="tpl-toast">
+  <div class="toast" role="status">
+    <span class="toast-text" data-d="text"></span>
+    <button class="toast-action" data-act="toast.action" data-d="action" hidden></button>
+  </div>
+</template>
+
+<template id="tpl-chart-card">
+  <section class="card chart-card">
+    <h3 class="chart-title" data-d="title"></h3>
+    <div class="chart-host" data-d="host"></div>
+    <div class="chart-legend" data-d="legend"></div>
+  </section>
+</template>

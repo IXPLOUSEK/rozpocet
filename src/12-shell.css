@@ -1,0 +1,278 @@
+/* 12-shell.css — skořápka: hlavička, pás měsíců, obrazovky, tabbar, FAB
+   — vlastní: L1
+   Jeden kód, tři velikosti:  <700 telefon | >=700 tablet | >=1024 Mac. */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;      /* fallback pro staré prohlížeče */
+  height: 100svh;     /* malý viewport — nepodskočí při klávesnici */
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* --- pruh s upozorněními nad hlavičkou ---------------------------------- */
+#banner-host {
+  position: relative;
+  z-index: var(--z-banner);
+  flex: 0 0 auto;
+  padding-top: var(--safe-t);
+  background: var(--header-bg);
+}
+#banner-host:empty { display: none; }
+
+/* --- hlavička ----------------------------------------------------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-header);
+  padding: var(--sp-1) max(var(--gutter), var(--safe-r)) var(--sp-1) max(var(--gutter), var(--safe-l));
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--hairline);
+}
+#banner-host:empty + .app-header { padding-top: calc(var(--safe-t) + var(--sp-1)); }
+
+.hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--hit);
+  min-width: var(--hit);
+  padding-inline: var(--sp-2);
+  border-radius: var(--r-sm);
+  color: var(--accent-text);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-med);
+}
+.hdr-btn .caret { font-size: var(--fs-xs); opacity: .8; }
+
+.hdr-title {
+  min-height: var(--hit);
+  padding-inline: var(--sp-2);
+  border-radius: var(--r-sm);
+  text-align: center;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semi);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hdr-bell { position: relative; justify-content: center; font-size: var(--fs-lg); }
+.hdr-bell .badge {
+  position: absolute;
+  top: 3px; inset-inline-end: 0;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--neg);
+  color: var(--bg);
+  font-size: var(--fs-xxs);
+  font-weight: var(--fw-bold);
+  line-height: 18px;
+  text-align: center;
+}
+
+/* --- pás měsíců --------------------------------------------------------- */
+.month-strip {
+  position: sticky;
+  top: var(--h-header);
+  z-index: var(--z-sticky);
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  min-height: var(--h-strip);
+  padding-inline: max(var(--gutter), var(--safe-l)) max(var(--gutter), var(--safe-r));
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--hairline);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;            /* posuvník skrytý, gesto zůstává */
+}
+.month-strip::-webkit-scrollbar { display: none; }
+.month-strip:empty { display: none; }
+
+/* --- posuvná oblast ------------------------------------------------------ */
+#main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: var(--sp-6) 120px;
+  padding-inline: max(var(--gutter), var(--safe-l)) max(var(--gutter), var(--safe-r));
+  /* místo pro tabbar, FAB a bezpečnou zónu */
+  padding-bottom: calc(var(--h-tabbar) + var(--safe-b) + var(--sp-8));
+}
+
+.screen { display: none; }
+.screen.is-active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-block: var(--sp-4);
+}
+
+/* --- tabbar ------------------------------------------------------------- */
+.tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: var(--z-tabbar);
+  display: flex;
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-inline: max(0px, var(--safe-l)) max(0px, var(--safe-r));
+  background: var(--header-bg);
+  border-top: 1px solid var(--hairline);
+}
+.tab {
+  flex: 1 1 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--h-tabbar);
+  padding-block: var(--sp-1);
+  color: var(--ink-2);
+  transition: color var(--dur-1) var(--ease-out);
+}
+.tab-ico { font-size: var(--fs-xl); line-height: 1; }
+.tab-lbl { font-size: var(--fs-xxs); font-weight: var(--fw-med); }
+.tab.is-active { color: var(--accent-text); }
+.tab.is-active .tab-lbl { font-weight: var(--fw-semi); }
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  inset-inline-start: 50%;
+  margin-inline-start: 6px;
+  min-width: 8px; height: 8px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+}
+
+/* --- FAB ---------------------------------------------------------------- */
+.fab {
+  position: fixed;
+  z-index: var(--z-fab);
+  inset-inline-end: calc(var(--gutter) + var(--safe-r));
+  bottom: calc(var(--h-tabbar) + var(--safe-b) + var(--sp-4));
+  width: 56px; height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-reg);
+  line-height: 1;
+  box-shadow: var(--sh-2);
+  transition: transform var(--dur-1) var(--ease-out);
+}
+
+/* --- závoj a hostitel pro sheet ------------------------------------------ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
+  background: var(--scrim);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+#sheet-host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;   /* klikat jde jen do samotného sheetu */
+}
+
+/* --- toast --------------------------------------------------------------- */
+.toast-host {
+  position: fixed;
+  z-index: var(--z-toast);
+  inset-inline: 0;
+  bottom: calc(var(--h-tabbar) + var(--safe-b) + var(--sp-4));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-inline: var(--gutter);
+  pointer-events: none;
+}
+
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+
+/* ======================= >= 700px — tablet ============================== */
+@media (min-width: 700px) {
+  /* Sekce jsou tu ve dvou sloupcích, karta má jen půl šířky — buňka
+     roste jen tolik, aby se do ní vešlo 15px písmo. */
+  :root { --gutter: var(--sp-5); --cell-w: 92px; --fs-amt: var(--fs-base); }
+
+  /* Sekce ve dvou sloupcích; všechno ostatní (KPI, upozornění, grafy)
+     zůstává přes celou šířku. */
+  .screen.is-active {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-4);
+    align-items: start;
+  }
+  .screen.is-active > :not(.sec-card) { grid-column: 1 / -1; }
+
+  /* Sheet se mění na vystředěné modální okno. */
+  #sheet-host { align-items: center; padding: var(--sp-5); }
+}
+
+/* ======================= >= 1024px — Mac ================================ */
+@media (min-width: 1024px) {
+  :root { --cell-w: 104px; }
+  #app { padding-inline-start: var(--rail-w); }
+
+  .app-header, .month-strip, .screen.is-active {
+    max-width: var(--content-max);
+    margin-inline: auto;
+    width: 100%;
+  }
+  #main { padding-bottom: var(--sp-8); }
+
+  /* Tabbar se překlopí na levý sloupec s viditelnými popisky. */
+  .tabbar {
+    inset-inline: 0 auto;
+    top: 0; bottom: 0;
+    width: var(--rail-w);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--sp-1);
+    padding: calc(var(--safe-t) + var(--sp-5)) var(--sp-3) var(--sp-5);
+    border-top: 0;
+    border-inline-end: 1px solid var(--hairline);
+  }
+  .tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    min-height: var(--hit);
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-md);
+  }
+  .tab-lbl { font-size: var(--fs-base); }
+  .tab.is-active { background: var(--accent-soft); }
+  .tab-badge { position: static; margin-inline-start: auto; }
+
+  .fab { bottom: var(--sp-6); inset-inline-end: var(--sp-6); }
+  .toast-host { bottom: var(--sp-6); padding-inline-start: var(--rail-w); }
+}

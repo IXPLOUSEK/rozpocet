@@ -1,0 +1,158 @@
+/* 11-base.css — reset, písmo, dotyk, fokus, přístupnost — vlastní: L1 */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  /* Nezkrácená vlastnost stojí PŘED prefixovanou, ať ji novější
+     prohlížeč nepřepíše zpátky starší hodnotou. */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  color-scheme: light dark;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);          /* explicitní podklad z tokenu */
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh);
+  overflow-x: hidden;             /* žádné nechtěné vodorovné posouvání */
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, h4, p, figure, blockquote { margin: 0; }
+h1, h2, h3, h4 { font-weight: var(--fw-semi); line-height: var(--lh-tight); text-wrap: balance; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+img, svg, canvas { max-width: 100%; }
+img { height: auto; }
+
+/* --- formulářové prvky ------------------------------------------------- */
+button, input, select, textarea {
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+}
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: inherit;
+}
+
+/* NEDOTKNUTELNÉ: pod 16px iOS při fokusu zoomuje a rozbije layout.
+   Řešením není user-scalable=no — zoom pro přístupnost musí fungovat. */
+input, select, textarea { font-size: 16px; }
+
+input, textarea { appearance: none; -webkit-appearance: none; border-radius: 0; }
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }
+input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; }
+
+/* Nativní <select> potřebuje vlastní barvy, jinak je v tmavém režimu
+   na Windows nečitelný. */
+select {
+  background-color: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: var(--hit);
+}
+
+/* --- čísla ------------------------------------------------------------- */
+/* Každý peněžní údaj má stejně široké číslice, aby sloupce seděly. */
+.amt, .amt-display, .kpi-value, .sec-sum-val, .tx-amt, .due-amt,
+.yrow-plan, .yrow-act, .tx-day-sum, .goal-amount, .badge, .tab-badge,
+.chart-tick, .legend-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* --- dotyk ------------------------------------------------------------- */
+button, .row, .chip, .chip-month, .tab, .fab, .cell, label, summary {
+  touch-action: manipulation;              /* pryč s 300ms prodlevou */
+  -webkit-tap-highlight-color: transparent;/* zrušeno vědomě… */
+}
+/* …a nahrazeno vlastním stiskem, aby dotyk nezůstal bez odezvy. */
+button:active, .chip:active, .chip-month:active, .tab:active {
+  opacity: .62;
+}
+.fab:active, .sec-add:active, .btn:active { transform: scale(.96); }
+.row-main:active, .tx:active, .alert-card:active, .yrow:active,
+.due-item:active { background: var(--surface-2); }
+
+/* --- fokus -------------------------------------------------------------- */
+/* Nikde holý :focus a nikde outline:none bez náhrady. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+.field:focus-within .field-label { color: var(--accent-text); }
+
+/* --- pomocné třídy ------------------------------------------------------ */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+[hidden] { display: none !important; }
+.print-only { display: none; }
+.truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Barvy podle znaménka — používej na jakémkoli textovém prvku. */
+.is-pos { color: var(--pos); }
+.is-neg { color: var(--neg); }
+.is-warn { color: var(--warn); }
+.is-muted { color: var(--ink-3); }
+
+/* --- omezený pohyb ------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+    animation-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- výběr textu -------------------------------------------------------- */
+::selection { background: var(--accent-soft); color: var(--ink); }
+
+/* --- najetí myší (jen na zařízeních, která ho mají) --------------------- */
+/* Na dotyku by se hover „zasekával“ po klepnutí, proto media dotaz. */
+@media (hover: hover) and (pointer: fine) {
+  .row-main:hover, .tx:hover, .yrow:hover, .alert-card:hover,
+  .due-item:hover, .sec-toggle:hover, .sec-add:hover, .tab:hover,
+  .chip:hover, .chip-month:hover, .sheet-close:hover, .goal-edit:hover {
+    background: var(--surface-2);
+  }
+  .chip.is-active:hover, .chip-month.is-active:hover,
+  .btn-primary:hover, .fab:hover, .banner-action:hover {
+    /* Míchání směrem k --ink ztmaví ve světlém a zesvětlí v tmavém
+       tématu, takže kontrast vůči --accent-ink v obou stoupne. */
+    background: var(--accent-text);
+    background: color-mix(in srgb, var(--accent) 84%, var(--ink));
+    color: var(--accent-ink);
+  }
+  .btn:hover { background: var(--hairline); }
+  .btn-danger:hover { background: var(--neg); filter: brightness(.92); }
+  .cell .amt:hover { background: var(--surface-2); }
+}
+
+/* Skrytý obsah nesmí roztáhnout stránku do stran. U <table> nestačí
+   width:1px — tabulka roste podle obsahu, proto se balí do bloku a ten
+   se odsune mimo plátno. Vlevo, aby se tím nezvětšila šířka dokumentu. */
+.sr-only { left: -10000px; top: auto; }
+.chart-data-wrap > table { width: auto; }

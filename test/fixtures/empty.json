@@ -1,0 +1,94 @@
+{
+  "app": "rozpocet",
+  "schema": 1,
+  "rev": 0,
+  "savedAt": "2026-01-04T09:00:00.000Z",
+  "deviceId": "d_fix42",
+  "activeYear": 2026,
+  "isDemo": false,
+  "settings": {
+    "theme": "auto",
+    "dueSoonDays": 7,
+    "autofillOnPaid": true,
+    "syncUrl": "",
+    "syncSecret": "",
+    "lastSyncAt": null,
+    "lastExportAt": null,
+    "installNagDismissedAt": null
+  },
+  "ui": {
+    "screen": "month",
+    "month": 8,
+    "yearTab": "summary",
+    "journalFilter": "all"
+  },
+  "years": {
+    "2026": {
+      "year": 2026,
+      "catalog": [],
+      "months": [
+        {
+          "m": 0,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 1,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 2,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 3,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 4,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 5,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 6,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 7,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 8,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 9,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 10,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 11,
+          "note": "",
+          "entries": []
+        }
+      ],
+      "tx": []
+    }
+  }
+}

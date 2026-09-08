@@ -1,0 +1,45 @@
+<div id="app">
+  <div id="banner-host"></div>
+
+  <header class="app-header" id="app-header">
+    <button class="hdr-btn" data-act="year.pick" aria-label="Změnit rok">
+      <span id="hdr-year">—</span><span class="caret" aria-hidden="true">▾</span>
+    </button>
+    <button class="hdr-title" data-act="month.pick" aria-label="Vybrat měsíc">
+      <span id="hdr-month">—</span>
+    </button>
+    <button class="hdr-btn hdr-bell" data-act="due.open" aria-label="Platby k zaplacení">
+      <span aria-hidden="true">🔔</span>
+      <span class="badge" id="hdr-badge" hidden>0</span>
+    </button>
+  </header>
+
+  <nav class="month-strip" id="month-strip" aria-label="Měsíce v roce"></nav>
+
+  <main id="main">
+    <section class="screen is-active" id="screen-month"   data-screen="month"   aria-label="Měsíc"></section>
+    <section class="screen" id="screen-year"    data-screen="year"    aria-label="Rok" hidden></section>
+    <section class="screen" id="screen-journal" data-screen="journal" aria-label="Deník" hidden></section>
+    <section class="screen" id="screen-savings" data-screen="savings" aria-label="Úspory" hidden></section>
+    <section class="screen" id="screen-more"    data-screen="more"    aria-label="Nastavení" hidden></section>
+  </main>
+
+  <section class="print-only" id="screen-print" aria-hidden="true"></section>
+
+  <button class="fab" id="fab" data-act="tx.quick" aria-label="Rychlý zápis výdaje">
+    <span aria-hidden="true">+</span>
+  </button>
+
+  <nav class="tabbar" id="tabbar" aria-label="Hlavní navigace">
+    <button class="tab is-active" data-act="nav" data-screen="month"   aria-current="page"><span class="tab-ico" aria-hidden="true">📋</span><span class="tab-lbl">Měsíc</span></button>
+    <button class="tab" data-act="nav" data-screen="year"    ><span class="tab-ico" aria-hidden="true">📊</span><span class="tab-lbl">Rok</span></button>
+    <button class="tab" data-act="nav" data-screen="journal" ><span class="tab-ico" aria-hidden="true">🧾</span><span class="tab-lbl">Deník</span><span class="tab-badge" id="tab-badge-journal" hidden></span></button>
+    <button class="tab" data-act="nav" data-screen="savings" ><span class="tab-ico" aria-hidden="true">🐖</span><span class="tab-lbl">Úspory</span></button>
+    <button class="tab" data-act="nav" data-screen="more"    ><span class="tab-ico" aria-hidden="true">⚙️</span><span class="tab-lbl">Víc</span></button>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+  <div id="sheet-host" hidden></div>
+  <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</div>

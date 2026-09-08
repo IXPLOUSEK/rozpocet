@@ -1,0 +1,98 @@
+/* 14-charts.css — ručně psané inline SVG a legenda — vlastní: L1
+   Barvu si SVG nikdy nenese samo. Nastaví se třída (.cat-3, .chart-bar-act…),
+   ta nastaví --c a tvar si ji přečte. Přebarvení témat je tím zadarmo.
+   --track, --grid a --cat-1…--cat-12 jsou definované v 10-tokens.css
+   (pro obě témata i pro tisk); tady se jen mapují na tvary. */
+
+.chart-card { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+.chart-title { font-size: var(--fs-base); font-weight: var(--fw-semi); color: var(--ink-2); }
+.chart-host { min-width: 0; }
+
+/* Responzivní SVG — poměr stran drží viewBox, ne pevná výška. */
+svg { width: 100%; height: auto; display: block; }
+.chart, .chart-svg { overflow: visible; }
+.chart text, .chart-svg text { fill: var(--ink-2); font-size: var(--fs-xs);
+                               font-family: var(--font-ui); }
+.chart-tick { fill: var(--ink-3); font-size: var(--fs-xxs); }
+.chart-value { fill: var(--ink); font-size: var(--fs-xs); font-weight: var(--fw-semi); }
+
+/* --- osy a mřížka ------------------------------------------------------ */
+.chart-grid, .chart-axis { stroke: var(--grid); stroke-width: 1; fill: none;
+                           shape-rendering: crispEdges; }
+.chart-axis { stroke: var(--hairline-strong); }
+.chart-zero { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+
+/* --- proužky a dráhy --------------------------------------------------- */
+/* Sémantické aliasy — jediné, co grafy o barvě vědí. */
+.chart, .chart-svg, .chart-legend, .chart-legend-list, .chart-card {
+  --bar-plan: var(--bar-plan-c);
+  --bar-act: var(--bar-act-c);
+  --bar-over: var(--bar-over-c);
+}
+.chart-track { fill: var(--track); }
+.chart-bar { fill: var(--c, var(--bar-act)); }
+.chart-bar-plan { fill: var(--bar-plan); }
+.chart-bar-act { fill: var(--bar-act); }
+.chart-bar.is-over, .chart-bar-act.is-over { fill: var(--bar-over); }
+.chart-slice { fill: var(--c, var(--bar-act)); stroke: var(--surface); stroke-width: 1.5; }
+.chart-donut { fill: none; stroke: var(--c, var(--bar-act)); stroke-linecap: butt; }
+.chart-donut-track { fill: none; stroke: var(--track); }
+.chart-line { fill: none; stroke: var(--c, var(--bar-act)); stroke-width: 2;
+              stroke-linejoin: round; stroke-linecap: round; }
+.chart-area { fill: var(--c, var(--bar-act)); fill-opacity: .16; stroke: none; }
+.chart-dot { fill: var(--c, var(--bar-act)); stroke: var(--surface); stroke-width: 1.5; }
+
+/* Vzory pro čárové řady — druhá informace navíc k barvě. */
+.dash-1 { stroke-dasharray: none; }
+.dash-2 { stroke-dasharray: 6 4; }
+.dash-3 { stroke-dasharray: 2 3; }
+.dash-4 { stroke-dasharray: 10 3 2 3; }
+
+/* --- kategoriální rampa ------------------------------------------------- */
+/* Střídá tmavý a středně světlý stupeň, takže sousední kategorie se liší
+   i jasem. Každá má ≥ 3:1 vůči --surface v obou tématech. */
+.cat-1 { --c: var(--cat-1); }   .cat-2 { --c: var(--cat-2); }
+.cat-3 { --c: var(--cat-3); }   .cat-4 { --c: var(--cat-4); }
+.cat-5 { --c: var(--cat-5); }   .cat-6 { --c: var(--cat-6); }
+.cat-7 { --c: var(--cat-7); }   .cat-8 { --c: var(--cat-8); }
+.cat-9 { --c: var(--cat-9); }   .cat-10 { --c: var(--cat-10); }
+.cat-11 { --c: var(--cat-11); } .cat-12 { --c: var(--cat-12); }
+
+/* Animace jen pro tvary, které se překreslují — a jen transform/opacity. */
+.chart-bar, .chart-slice { transition: opacity var(--dur-2) var(--ease-out); }
+.chart-fade { opacity: .35; }
+
+/* --- prstenec s číslem uprostřed ---------------------------------------- */
+/* Obal má position:relative inline z 40-charts.js. */
+.chart-donut-center { display: flex; flex-direction: column; align-items: center;
+                      justify-content: center; text-align: center; pointer-events: none; }
+.chart-donut-value { font-size: var(--fs-xl); font-weight: var(--fw-bold);
+                     line-height: var(--lh-tight); font-variant-numeric: tabular-nums; }
+.chart-donut-sub { font-size: var(--fs-xs); color: var(--ink-2); }
+
+/* --- legenda ------------------------------------------------------------ */
+/* Dva sloupce; barva nikdy nenese význam sama — vedle vždy stojí popisek.
+   Názvy tříd staví 40-charts.js (.chart-legend-*), .legend-* jsou aliasy. */
+.chart-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: var(--sp-1) var(--sp-3); }
+.chart-legend:empty { display: none; }
+.chart-legend-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                     gap: var(--sp-1) var(--sp-3); }
+.chart-legend-item, .legend-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: var(--sp-2); min-height: 24px; font-size: var(--fs-xs);
+}
+.chart-swatch, .legend-swatch {
+  width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto;
+  background: var(--c, var(--bar-act));
+}
+.chart-swatch.is-plan, .legend-swatch.is-plan { background: var(--bar-plan); }
+.chart-swatch.is-line, .legend-swatch.is-line { height: 3px; border-radius: var(--r-full); }
+.chart-legend-name, .legend-label { color: var(--ink-2); overflow: hidden;
+                                    text-overflow: ellipsis; white-space: nowrap; }
+.chart-legend-val, .legend-value { color: var(--ink); font-weight: var(--fw-med);
+                                   font-variant-numeric: tabular-nums; }
+
+@media (min-width: 700px) {
+  .chart-legend, .chart-legend-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

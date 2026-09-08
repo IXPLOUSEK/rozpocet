@@ -1,0 +1,518 @@
+/* 13-components.css — všechny třídy z 21-templates.html — vlastní: L1
+   Konvence pro JS: stavy jsou .is-*; .is-pos/.is-neg/.is-warn/.is-muted
+   (z 11-base.css) obarví libovolný textový prvek podle znaménka.
+   Kontejnery, které šablony nemají, ale render je potřebuje:
+   .kpi-row (mřížka KPI), .legend-item (14-charts.css), .btn (patička sheetu). */
+
+/* ============================== karta ================================== */
+.card { background: var(--surface); border: 1px solid var(--hairline);
+        border-radius: var(--r-lg); box-shadow: var(--sh-1); overflow: hidden; }
+
+/* =============================== KPI =================================== */
+.kpi-row, .kpis, .card:has(> .kpi) {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+}
+.card:has(> .kpi) { padding: var(--sp-4); }
+.kpi { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kpi-label { font-size: var(--fs-xs); font-weight: var(--fw-med); color: var(--ink-2); }
+/* Tři KPI vedle sebe se při 390px do 28px nevejdou — částka se musí
+   umět zmenšit, ne zalomit uprostřed čísla. */
+.kpi-value { font-size: clamp(17px, 4.6vw, var(--fs-2xl)); font-weight: var(--fw-bold);
+             line-height: var(--lh-tight); letter-spacing: -.02em; overflow-wrap: break-word; }
+.kpi-hint { font-size: var(--fs-xs); color: var(--ink-3); }
+.kpi-hint:empty, .banner-body:empty, .tx-note:empty, .row-sub:empty,
+.field-hint:empty, .sheet-foot:empty { display: none; }
+
+/* ====================== upozornění na splatnost ======================== */
+.alert-card {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: var(--sp-3); width: 100%;
+  min-height: var(--hit); padding: var(--sp-3) var(--sp-4);
+  background: var(--warn-soft); border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+}
+.alert-card.is-overdue { background: var(--neg-soft); }
+.alert-ico { font-size: var(--fs-xl); line-height: 1; }
+.alert-body { display: flex; flex-direction: column; min-width: 0; }
+.alert-title { font-size: var(--fs-base); font-weight: var(--fw-semi); }
+.alert-sub { font-size: var(--fs-xs); color: var(--ink-2); }
+.alert-chevron { color: var(--ink-3); font-size: var(--fs-xl); }
+
+/* ============================ sekční karta ============================= */
+.sec-head { display: flex; flex-direction: column; gap: var(--sp-2);
+            padding: var(--sp-3) var(--sp-3) var(--sp-2); }
+.sec-toggle { display: flex; align-items: center; justify-content: space-between;
+              gap: var(--sp-2); min-height: var(--hit); margin-block: -8px; }
+.sec-title { font-size: var(--fs-xs); font-weight: var(--fw-bold);
+             letter-spacing: .07em; color: var(--accent-text); }
+.sec-chevron { color: var(--ink-3); transition: transform var(--dur-2) var(--ease-out); }
+.sec-toggle[aria-expanded="false"] .sec-chevron { transform: rotate(180deg); }
+.sec-card:has(.sec-toggle[aria-expanded="false"]) .sec-rows,
+.sec-card:has(.sec-toggle[aria-expanded="false"]) .sec-add,
+.sec-card.is-collapsed .sec-rows, .sec-card.is-collapsed .sec-add { display: none; }
+
+.sec-sums { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); }
+.sec-sum { display: flex; flex-direction: column; min-width: 0; }
+.sec-sum-lbl { font-size: var(--fs-xxs); color: var(--ink-3); }
+.sec-sum-val { font-size: var(--fs-base); font-weight: var(--fw-med); }
+.sec-sum-val.is-strong { font-weight: var(--fw-bold); }
+
+/* Plán = tenká referenční linka, skutečnost = tlustý proužek. Liší se
+   tvarem, ne jen barvou — každý má vůči své dráze ≥ 3:1. */
+.sec-bars, .yrow-bars { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.minibar, .ybar, .goalbar { display: block; background: var(--track);
+                            border-radius: var(--r-full); overflow: hidden; }
+.minibar > i, .ybar > i, .goalbar > i { display: block; width: 0; height: 100%;
+                                        border-radius: inherit; }
+.minibar-plan, .ybar-plan { height: 4px; }
+.minibar-plan > i, .ybar-plan > i { background: var(--bar-plan-c); }
+.minibar-act, .ybar-act { height: 8px; }
+.minibar-act > i, .ybar-act > i { background: var(--bar-act-c);
+                                  transition: width var(--dur-2) var(--ease-out); }
+.minibar-act > i.is-over, .ybar-act > i.is-over { background: var(--bar-over-c); }
+
+.sec-rows { border-top: 1px solid var(--hairline); }
+.sec-add { display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+           min-height: var(--hit); padding-inline: var(--sp-3);
+           border-top: 1px solid var(--hairline); color: var(--accent-text);
+           font-size: var(--fs-base); font-weight: var(--fw-med);
+           transition: transform var(--dur-1) var(--ease-out); }
+
+/* ============================== řádek ================================== */
+/* Rozpočet šířky při 390px: název ~150 | plán 84 | skutečnost 84 | ✓ 36 */
+.row { display: grid; align-items: center; min-height: var(--hit);
+       grid-template-columns: minmax(0, 1fr) var(--cell-w) var(--cell-w) auto;
+       padding-inline: var(--sp-3); border-top: 1px solid var(--hairline); }
+.sec-rows > .row:first-child { border-top: 0; }
+/* Buňka zůstává 84px i se zaškrtávátkem — místo si vezme z pravého
+   odsazení řádku, ne z částky. */
+.row:has(.row-paid:not([hidden])) { padding-inline-end: var(--sp-1); }
+
+.row-main { display: flex; align-items: center; gap: var(--sp-2); min-width: 0;
+            min-height: var(--hit); padding-block: var(--sp-2);
+            padding-inline-end: var(--sp-1); border-radius: var(--r-sm); }
+.row-ico, .tx-ico { flex: 0 0 auto; width: 24px; font-size: var(--fs-lg);
+                    line-height: 1; text-align: center; }
+.row-text, .tx-body, .due-body, .alert-body { display: flex; flex-direction: column; min-width: 0; }
+.row-name, .tx-name, .due-name { font-size: var(--fs-base); overflow: hidden;
+                                 text-overflow: ellipsis; white-space: nowrap; }
+/* Druhý řádek: pilulka se splatností, odznak „ručně“ nebo text k cíli. */
+.row-sub { display: flex; flex-wrap: wrap; align-items: center;
+           gap: var(--sp-1) var(--sp-2); font-size: var(--fs-xs);
+           line-height: 1.3; color: var(--ink-2); }
+.row-sub.is-warn { color: var(--warn); }
+.row-sub.is-neg { color: var(--neg); }
+.pill { display: inline-flex; align-items: center; padding: 1px var(--sp-2);
+        border-radius: var(--r-full); border: 1px solid var(--hairline-strong);
+        border-color: color-mix(in srgb, currentColor 40%, transparent);
+        background: var(--surface-2); font-size: var(--fs-xxs);
+        font-weight: var(--fw-med); white-space: nowrap; }
+.pill.is-warn { background: var(--warn-soft); color: var(--warn); }
+.pill.is-neg  { background: var(--neg-soft);  color: var(--neg); }
+.pill.is-pos  { background: var(--pos-soft);  color: var(--pos); }
+.pill.is-muted { color: var(--ink-3); }
+
+/* --------------------- buňka s částkou (jádro appky) ------------------- */
+/* Vstup drží surové číslo (8000) a je terčem dotyku; span nad ním ukazuje
+   naformátovanou hodnotu (8 000 Kč). Při fokusu se span skryje a vstup
+   zviditelní. Čistě CSS, bez jediného řádku JS. */
+.cell { position: relative; display: block; height: var(--hit); min-width: 0; }
+.cell .amt {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  padding-inline: var(--sp-1); border: 0; border-radius: var(--r-sm);
+  background: transparent; text-align: right;
+  color: transparent;            /* v klidu neviditelný */
+  caret-color: var(--accent);    /* kurzor ale vidět musí */
+  scroll-margin-block: 96px;     /* ať ho nezakryje lepivá hlavička */
+}
+.cell .amt::placeholder { color: transparent; }
+.cell .amt-display {
+  position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: flex-end; padding-inline: var(--sp-1);
+  font-size: var(--fs-amt); white-space: nowrap; overflow: hidden;
+  pointer-events: none;          /* klik projde do vstupu */
+}
+.cell .amt:focus { color: var(--ink); background: var(--surface-2); }
+.cell .amt:focus + .amt-display { visibility: hidden; }
+.cell .amt:focus::placeholder { color: var(--ink-3); }
+.cell .amt:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cell-plan .amt-display { color: var(--ink-2); }
+.cell-act .amt-display { color: var(--ink); font-weight: var(--fw-med); }
+.amt-display.is-auto { color: var(--ink-3); }   /* dopočteno z deníku */
+
+/* -------------------------- zaplaceno / cíl --------------------------- */
+/* Terč 44x44, v mřížce zabere 36px — zbytek si vezme z odsazení řádku. */
+.row-paid { display: grid; place-items: center; width: var(--hit); height: var(--hit);
+            margin-inline-end: -8px; color: var(--ink-3); }
+.row-paid > span, .due-check > span {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border: 1.5px solid var(--hairline-strong); border-radius: var(--r-full);
+  font-size: var(--fs-xs); color: transparent;
+}
+.row-paid[aria-pressed="true"] > span, .due-check[aria-pressed="true"] > span {
+  background: var(--pos); border-color: var(--pos); color: var(--bg);
+}
+.row-goal { grid-column: 1 / -1; display: flex; align-items: center;
+            gap: var(--sp-2); padding-bottom: var(--sp-2); }
+.goalbar { flex: 1 1 auto; height: 6px; }
+.goalbar > i { background: var(--pos); transition: width var(--dur-2) var(--ease-out); }
+.goalbar > i.is-warn { background: var(--warn); }
+.goalbar-lg { height: 10px; }
+.goal-text { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--ink-2); }
+
+/* ============================== chipy ================================== */
+.chip, .chip-month {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--hit); padding-inline: var(--sp-3); border-radius: var(--r-full);
+  background: var(--surface-2); color: var(--ink-2); font-size: var(--fs-sm);
+  font-weight: var(--fw-med); white-space: nowrap;
+}
+.chip.is-active, .chip-month.is-active {
+  background: var(--accent); color: var(--accent-ink); font-weight: var(--fw-semi);
+}
+/* V pásu měsíců má chip stejnou barvu jako pás, takže tam podklad nemá
+   co dělat — nese ho až aktivní měsíc. */
+.chip-month { flex-direction: column; gap: 3px; min-width: var(--hit);
+              padding-block: var(--sp-2); scroll-snap-align: center;
+              background: transparent; }
+.chip-month.is-active { color: var(--accent-ink); }
+.chip-month.is-today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.chip-bar { display: block; width: 0; max-width: 100%; height: 3px;
+            border-radius: var(--r-full); background: var(--bar-act-c); }
+.chip-month.is-active .chip-bar { background: var(--accent-ink); }
+
+/* ============================ deník (tx) =============================== */
+.tx-day { display: flex; flex-direction: column; }
+.tx-day-head { display: flex; align-items: baseline; justify-content: space-between;
+               gap: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+               background: var(--surface-2); font-size: var(--fs-xs); color: var(--ink-2); }
+.tx-day-label { font-weight: var(--fw-semi); }
+.tx-day-list { display: flex; flex-direction: column; }
+.tx { display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center; gap: var(--sp-3); width: 100%; min-height: var(--hit);
+      padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--hairline); }
+.tx-day-list > .tx:first-child { border-top: 0; }
+.tx-note { font-size: var(--fs-xs); color: var(--ink-3); overflow: hidden;
+           text-overflow: ellipsis; white-space: nowrap; }
+.tx-amt, .due-amt { font-size: var(--fs-base); font-weight: var(--fw-med); }
+
+/* ============================ roční řádek ============================== */
+.yrow { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto auto;
+        align-items: center; gap: var(--sp-3); width: 100%; min-height: var(--hit);
+        padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--hairline); }
+.yrow:first-child { border-top: 0; }
+.yrow-month { font-size: var(--fs-sm); color: var(--ink-2); }
+.yrow-vals { display: flex; flex-direction: column; align-items: flex-end; }
+.yrow-plan { font-size: var(--fs-xs); color: var(--ink-3); }
+.yrow-act { font-size: var(--fs-base); font-weight: var(--fw-med); }
+.yrow-dot { width: 8px; height: 8px; border-radius: var(--r-full); background: var(--warn); }
+.yrow-dot.is-neg { background: var(--neg); }
+
+/* =============================== cíle ================================== */
+.goal-card { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); }
+.goal-head { display: flex; align-items: center; gap: var(--sp-2); }
+.goal-ico { font-size: var(--fs-xl); line-height: 1; }
+.goal-name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-lg); font-weight: var(--fw-semi); }
+.goal-edit { flex: 0 0 auto; min-height: var(--hit); padding-inline: var(--sp-2);
+             color: var(--accent-text); font-size: var(--fs-sm); font-weight: var(--fw-med); }
+.goal-amount { font-size: var(--fs-xl); font-weight: var(--fw-bold); }
+.goal-of { font-size: var(--fs-base); font-weight: var(--fw-reg); color: var(--ink-2); }
+.goal-meta { font-size: var(--fs-xs); color: var(--ink-2); }
+.goal-sep { color: var(--ink-3); }
+.goal-months { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+.goal-months > * { flex: 1 1 0; min-width: 3px; background: var(--accent-soft);
+                   border-radius: var(--r-xs); }
+.goal-months > .is-active { background: var(--accent); }
+
+/* ========================= položka splatnosti ========================== */
+.due-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: center; gap: var(--sp-3); min-height: var(--hit);
+            padding-block: var(--sp-1); border-top: 1px solid var(--hairline); }
+.due-item:first-child { border-top: 0; }
+.due-check { display: grid; place-items: center; width: var(--hit); height: var(--hit); }
+.due-when { font-size: var(--fs-xs); color: var(--ink-2); }
+.due-item.is-overdue .due-when { color: var(--neg); font-weight: var(--fw-med); }
+.due-item.is-soon .due-when { color: var(--warn); }
+
+/* ============================== sheet ================================== */
+.sheet {
+  pointer-events: auto; display: flex; flex-direction: column; width: 100%;
+  max-height: 88vh; max-height: 88svh;
+  background: var(--surface-3); border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--sh-3); padding-bottom: var(--safe-b);
+  overscroll-behavior: contain;
+  animation: sheet-up var(--dur-3) var(--ease-spring) both;
+}
+/* 61-sheets.js přidá .is-open na další snímek; animace výše běží už při
+   vložení, takže .is-open jen pojistí koncový stav. */
+.sheet.is-open { transform: none; opacity: 1; }
+/* Zavírací animaci spustí JS třídou .is-closing na #sheet-host. */
+#sheet-host.is-closing .sheet { animation: sheet-down var(--dur-2) var(--ease-out) both; }
+@keyframes sheet-up { from { transform: translateY(100%); opacity: .5 }
+                      to { transform: translateY(0); opacity: 1 } }
+@keyframes sheet-down { from { transform: translateY(0); opacity: 1 }
+                        to { transform: translateY(100%); opacity: 0 } }
+.sheet-grabber { flex: 0 0 auto; width: 36px; height: 5px;
+                 margin: var(--sp-2) auto var(--sp-1);
+                 border-radius: var(--r-full); background: var(--hairline-strong); }
+.sheet-head { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+              align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); }
+.sheet-title { font-size: var(--fs-xl); font-weight: var(--fw-bold); }
+.sheet-close { display: grid; place-items: center; width: var(--hit); height: var(--hit);
+               margin-inline-end: -8px; border-radius: var(--r-full);
+               background: var(--surface-2); color: var(--ink-2); }
+.sheet-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+              gap: var(--sp-4); padding: var(--sp-2) var(--sp-4) var(--sp-4);
+              overflow-y: auto; overscroll-behavior: contain; }
+.sheet-foot { flex: 0 0 auto; display: flex; gap: var(--sp-2);
+              padding: var(--sp-3) var(--sp-4) var(--sp-4);
+              border-top: 1px solid var(--hairline); }
+.sheet-foot > * { flex: 1 1 0; }
+
+/* Tlačítka v patičce sheetu a v dialozích. */
+.btn { display: inline-flex; align-items: center; justify-content: center;
+       min-height: var(--hit); padding-inline: var(--sp-4); border-radius: var(--r-md);
+       background: var(--surface-2); color: var(--ink); font-size: var(--fs-md);
+       font-weight: var(--fw-semi); transition: transform var(--dur-1) var(--ease-out); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-danger { background: var(--neg); color: var(--bg); }
+.btn-ghost { background: transparent; color: var(--accent-text); }
+.btn[disabled] { opacity: .45; cursor: default; }
+
+/* =============================== pole ================================== */
+.field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.field-label { font-size: var(--fs-sm); font-weight: var(--fw-med); color: var(--ink-2); }
+.field-input { min-height: var(--hit); padding: var(--sp-2) var(--sp-3);
+               border: 1px solid var(--hairline-strong); border-radius: var(--r-md);
+               background: var(--bg); color: var(--ink); }
+.field-input::placeholder { color: var(--ink-3); }
+.field-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px;
+                             border-color: var(--accent); }
+.field-hint { font-size: var(--fs-xs); color: var(--ink-3); }
+.field.is-error .field-input { border-color: var(--neg); }
+.field.is-error .field-hint { color: var(--neg); }
+
+/* ============================== banner ================================= */
+.banner { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+          align-items: center; gap: var(--sp-2) var(--sp-3);
+          padding: var(--sp-3) max(var(--gutter), var(--safe-r))
+                   var(--sp-3) max(var(--gutter), var(--safe-l));
+          background: var(--accent-soft); border-bottom: 1px solid var(--hairline); }
+.banner.is-warn { background: var(--warn-soft); }
+.banner.is-danger { background: var(--neg-soft); }
+.banner-ico { font-size: var(--fs-lg); line-height: 1; }
+.banner-text { display: flex; flex-direction: column; min-width: 0; }
+.banner-title { font-size: var(--fs-sm); font-weight: var(--fw-semi); text-wrap: balance; }
+.banner-body { font-size: var(--fs-xs); color: var(--ink-2); }
+.banner-action { min-height: var(--hit); padding-inline: var(--sp-3);
+                 border-radius: var(--r-sm); background: var(--accent);
+                 color: var(--accent-ink); font-size: var(--fs-sm);
+                 font-weight: var(--fw-semi); white-space: nowrap; }
+.banner-close { display: grid; place-items: center; width: var(--hit); height: var(--hit);
+                margin-inline-end: -12px; color: var(--ink-2); }
+
+/* =============================== toast ================================= */
+.toast { pointer-events: auto; display: flex; align-items: center; gap: var(--sp-3);
+         max-width: min(100%, 420px); padding: var(--sp-3) var(--sp-4);
+         border-radius: var(--r-md); background: var(--toast-bg);
+         color: var(--toast-ink); box-shadow: var(--sh-2); font-size: var(--fs-sm); }
+.toast-text { min-width: 0; }
+.toast-action { flex: 0 0 auto; min-height: var(--hit); padding-inline: var(--sp-2);
+                color: var(--toast-accent); font-weight: var(--fw-semi); white-space: nowrap; }
+
+/* ============================ prázdný stav ============================= */
+.empty { padding: var(--sp-6) var(--sp-4); text-align: center; text-wrap: balance;
+         font-size: var(--fs-sm); color: var(--ink-3); }
+
+/* ═══════════ třídy, které staví JS a v šablonách nejsou ═══════════════
+   Kontrakt s JS: 61-sheets.js skládá .btn-<kind>, .toast-<kind> a
+   .banner-<kind>; kind ∈ primary | ghost | danger | warn | error | accent. */
+
+.btn-warn { background: var(--warn); color: var(--bg); }   /* 5.02 / 10.22 */
+.banner-error, .banner-danger { background: var(--neg-soft); }
+.banner-warn { background: var(--warn-soft); }
+.banner-accent { background: var(--accent-soft); }
+
+/* Toast: JS přidá .is-in na další snímek a před zavřením ji sundá,
+   takže tady musí být přechod, ne jednorázová animace. */
+.toast { opacity: 0; transform: translateY(10px);
+         transition: opacity var(--dur-2) var(--ease-out),
+                     transform var(--dur-2) var(--ease-out); }
+.toast.is-in { opacity: 1; transform: none; }
+.toast-error { background: var(--neg); color: var(--bg); }
+.toast-warn  { background: var(--warn); color: var(--bg); }
+.toast-error .toast-action, .toast-warn .toast-action { color: var(--bg);
+  text-decoration: underline; }
+
+/* Chybný vstup — hlásí se i mimo fokus, protože JS na něj skáče. */
+.is-invalid, .field-input.is-invalid { border-color: var(--neg); }
+.is-invalid:not(.amt) { outline: 2px solid var(--neg); outline-offset: -1px; }
+.cell .amt.is-invalid { outline: 2px solid var(--neg); outline-offset: -2px;
+                        color: var(--neg); }
+.cell .amt.is-invalid + .amt-display { color: var(--neg); }
+
+/* Proužek pod měsícem v pásu se barví podle zůstatku. Pravidlo pro
+   aktivní měsíc stojí níž, aby na rose výplni zůstal čitelný. */
+.chip-bar.is-pos { background: var(--pos); }
+.chip-bar.is-neg { background: var(--neg); }
+.chip-bar.is-zero { background: var(--hairline-strong); }
+.chip-lbl { font-size: var(--fs-sm); }
+.chip-month.is-active .chip-bar,
+.chip-month.is-active .chip-bar.is-pos,
+.chip-month.is-active .chip-bar.is-neg,
+.chip-month.is-active .chip-bar.is-zero { background: var(--accent-ink); }
+
+/* Zůstatek je hrdina — JS mu dává grid-column i větší písmo inline,
+   tady dostane oddělení a vzduch. */
+.kpi-hero { padding-top: var(--sp-3); border-top: 1px solid var(--hairline); }
+.kpi-hero .kpi-value { letter-spacing: -.03em; }
+
+/* --- text uvnitř sheetů a karet nastavení ---------------------------- */
+.sheet-text { font-size: var(--fs-base); line-height: var(--lh-loose); color: var(--ink); }
+.sheet-text-dim { color: var(--ink-2); font-size: var(--fs-sm); }
+.sheet-list { display: flex; flex-direction: column; gap: var(--sp-2);
+              font-size: var(--fs-base); }
+.sheet-list > li { display: flex; gap: var(--sp-2); }
+.sheet-list > li::before { content: "•"; color: var(--accent-text); flex: 0 0 auto; }
+.sheet-copy .sheet-body { gap: var(--sp-2); }
+.copy-box, .code-block {
+  width: 100%; padding: var(--sp-3); border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md); background: var(--surface-2); color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-sm); line-height: 1.5; resize: vertical;
+}
+.code-block { max-height: 40svh; overflow: auto; white-space: pre;
+              overscroll-behavior: contain; resize: none; }
+.sync-choice { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.sync-choice .chip { flex: 1 1 auto; justify-content: flex-start;
+                     padding-block: var(--sp-2); white-space: normal; text-align: start; }
+
+/* --- obrazovka Rok --------------------------------------------------- */
+.year-total { padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+.year-rows { padding-block: var(--sp-1); }
+.seg::-webkit-scrollbar { display: none; }
+.ycmp-wrap { padding: var(--sp-2); }
+.ycmp { font-size: var(--fs-sm); }
+.ycmp th, .ycmp td { padding: var(--sp-2); border-bottom: 1px solid var(--hairline);
+                     text-align: right; white-space: nowrap; }
+.ycmp th:first-child, .ycmp td:first-child { text-align: start; }
+.ycmp thead th { color: var(--ink-2); font-weight: var(--fw-med); font-size: var(--fs-xs); }
+.ycmp td { font-variant-numeric: tabular-nums; }
+.ycmp tbody tr:last-child td { border-bottom: 0; }
+
+/* --- obrazovka Víc (nastavení) --------------------------------------- */
+.set-card { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+.set-line { font-size: var(--fs-sm); color: var(--ink-2); overflow-wrap: anywhere; }
+.set-key { color: var(--ink); font-weight: var(--fw-semi); }
+/* Čísla kroků si nese text z 54-year-more.js („1. Klepni…“), takže tady
+   žádný counter — jen visící odsazení, ať se druhý řádek zarovná. */
+.set-steps { display: flex; flex-direction: column; gap: var(--sp-2);
+             font-size: var(--fs-sm); color: var(--ink-2); }
+.set-step { padding-inline-start: 1.6em; text-indent: -1.6em; line-height: var(--lh-loose); }
+
+/* --- tiskový náhled (#screen-print) ---------------------------------- */
+/* Zobrazuje se i na displeji jako překryv, proto má běžné styly. */
+.pv-title { font-size: var(--fs-2xl); font-weight: var(--fw-bold); }
+.pv-sub { margin-bottom: var(--sp-5); font-size: var(--fs-sm); color: var(--ink-2); }
+.pv-sec { margin: var(--sp-5) 0 var(--sp-2); font-size: var(--fs-sm);
+          font-weight: var(--fw-bold); letter-spacing: .07em; color: var(--accent-text); }
+.pv-empty { font-size: var(--fs-sm); color: var(--ink-3); }
+.pv-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.pv-table th, .pv-table td { padding: var(--sp-2) var(--sp-1);
+                             border-bottom: 1px solid var(--hairline); text-align: right; }
+.pv-table th:first-child, .pv-table td:first-child { text-align: start; }
+.pv-table thead th { color: var(--ink-2); font-weight: var(--fw-med); font-size: var(--fs-xs); }
+.pv-table td { font-variant-numeric: tabular-nums; }
+.pv-table tfoot td { font-weight: var(--fw-bold); border-top: 2px solid var(--hairline-strong); }
+body.is-print-preview #main { overflow: hidden; }
+
+/* --- vlastní kontrola (70-selftest.js) -------------------------------- */
+.selftest { position: fixed; inset: auto var(--sp-3) var(--sp-3); z-index: var(--z-toast);
+            max-height: 70svh; display: flex; flex-direction: column;
+            border: 1px solid var(--hairline-strong); border-radius: var(--r-lg);
+            background: var(--surface-3); box-shadow: var(--sh-2); overflow: hidden; }
+.selftest-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+                 padding: var(--sp-3); border-bottom: 1px solid var(--hairline); }
+.selftest-list { overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-2); }
+.st-row { display: grid; grid-template-columns: 18px minmax(0, 1fr);
+          gap: var(--sp-1) var(--sp-2); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); }
+.st-mark { font-weight: var(--fw-bold); }
+.st-row-ok .st-mark, .st-pass { color: var(--pos); }
+.st-row-fail .st-mark, .st-fail { color: var(--neg); }
+.st-row-skip .st-mark, .st-row-skip .st-name { color: var(--ink-3); }
+.st-row-fail { background: var(--neg-soft); border-radius: var(--r-xs); }
+.st-name { overflow-wrap: anywhere; }
+.st-detail { grid-column: 2; font-size: var(--fs-xs); color: var(--ink-2);
+             overflow-wrap: anywhere; }
+
+/* --- poslední drobnosti z JS ------------------------------------------ */
+/* Otevřený sheet zamkne pozadí; scrollTop #main se přitom neztratí,
+   protože obsah pořád přetéká. */
+body.has-sheet #main { overflow: hidden; }
+/* Karta se třemi KPI na obrazovce Rok — mřížku dědí z .card:has(> .kpi). */
+.year-head { padding: var(--sp-4); }
+/* Lišta tlačítek v nastavení; rozvržení si JS staví inline. */
+.set-actions { margin-top: var(--sp-1); }
+/* Nápověda nad tiskovým náhledem — v tisku ji schová .no-print. */
+.print-hint { background: var(--surface); color: var(--ink); font-size: var(--fs-sm); }
+/* Tabulka s daty grafu je jen pro odečítače obrazovky (má i .sr-only);
+   graf sám nese totéž vizuálně, proto se nikdy nezobrazuje. */
+.chart-data { border-collapse: collapse; }
+
+/* ---------- oprava po vizuální kontrole ---------- */
+
+/* Částka se nikdy nesmí zlomit uvnitř "Kč". Viděli jsme "1 086 838 K"
+   na jednom řádku a "č" na dalším. Radši ať přeteče nebo zmenší písmo. */
+.kpi-value,
+.amt-display,
+.sec-sum-val,
+.yrow-plan,
+.yrow-act,
+.goal-amount,
+.tx-amt,
+.due-amt {
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+}
+
+/* Roční souhrn: tři sedmimístné částky vedle sebe se na telefon nevejdou.
+   Zůstatek jde na celou šířku pod ně, stejně jako na měsíční obrazovce. */
+@media (max-width: 460px) {
+  .year-head { grid-template-columns: 1fr 1fr; }
+  .year-head > .kpi:last-child { grid-column: 1 / -1; }
+}
+
+/* Textová pole v panelech musí mít taky 16 px, jinak iOS při klepnutí
+   přiblíží stránku. Potvrzeno měřením: .copy-box a .code-block dědily
+   --fs-sm. */
+.copy-box,
+.code-block,
+textarea { font-size: 16px; }
+
+/* Mřížka měsíců ve výběru z hlavičky. */
+.month-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2);
+}
+.month-cell {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: var(--hit); padding: var(--sp-2);
+  border: 1px solid var(--hairline); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--ink); text-align: left;
+}
+.month-cell.is-active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.month-cell-name { font-size: var(--fs-sm); font-weight: var(--fw-med); }
+.month-cell-val { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.month-cell.is-active .month-cell-val { color: var(--accent-ink); }
+
+/* Dráha ukazatele je světlá schválně — jenže pak není vidět, kde ukazatel
+   končí. Místo tmavé výplně (v růžovém rozhraní by křičela) dostane tenkou
+   hranici, která proti podkladu drží 3:1. */
+.goalbar,
+.minibar,
+.ybar {
+  background: var(--meter-track) !important;
+  border: 1px solid var(--meter-edge, var(--ink-3));
+  box-sizing: border-box;
+}

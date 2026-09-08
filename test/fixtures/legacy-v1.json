@@ -1,0 +1,271 @@
+{
+  "app": "rozpocet",
+  "rev": 12,
+  "savedAt": "2025-11-30T21:44:03.000Z",
+  "deviceId": "d_legacy",
+  "activeYear": 2025,
+  "isDemo": false,
+  "settings": {
+    "theme": "light",
+    "dueSoonDays": 5
+  },
+  "ui": {
+    "screen": "month",
+    "month": 10
+  },
+  "years": {
+    "2025": {
+      "year": 2025,
+      "catalog": [
+        {
+          "id": "c_vyplata",
+          "sec": "income",
+          "name": "Výplata",
+          "icon": "💰",
+          "order": 10,
+          "recurring": true,
+          "dueDay": null,
+          "goal": null,
+          "archived": false,
+          "createdAt": "2025-01-02T10:00:00.000Z",
+          "updatedAt": "2025-11-30T21:44:03.000Z"
+        },
+        {
+          "id": "c_najem",
+          "sec": "fixed",
+          "name": "Nájem",
+          "icon": "🏠",
+          "order": 20,
+          "recurring": true,
+          "dueDay": 15,
+          "goal": null,
+          "archived": false,
+          "createdAt": "2025-01-02T10:00:00.000Z",
+          "updatedAt": "2025-11-30T21:44:03.000Z"
+        },
+        {
+          "id": "c_jidlo",
+          "sec": "daily",
+          "name": "Jídlo a potraviny",
+          "icon": "🛒",
+          "order": 30,
+          "recurring": true,
+          "dueDay": null,
+          "goal": null,
+          "archived": false,
+          "createdAt": "2025-01-02T10:00:00.000Z",
+          "updatedAt": "2025-11-30T21:44:03.000Z"
+        },
+        {
+          "id": "c_rezerva",
+          "sec": "savings",
+          "name": "Rezerva",
+          "icon": "🛟",
+          "order": 40,
+          "recurring": true,
+          "dueDay": null,
+          "goal": {
+            "target": 50000,
+            "startBalance": 0,
+            "targetDate": "2025-12-31"
+          },
+          "archived": false,
+          "createdAt": "2025-01-02T10:00:00.000Z",
+          "updatedAt": "2025-11-30T21:44:03.000Z"
+        }
+      ],
+      "months": [
+        {
+          "m": 0,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 1,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 2,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 3,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 4,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 5,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 6,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 7,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 8,
+          "note": "",
+          "entries": []
+        },
+        {
+          "m": 9,
+          "note": "",
+          "entries": [
+            {
+              "id": "e_leg90",
+              "cat": "c_vyplata",
+              "plan": 38000,
+              "act": 38000,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg91",
+              "cat": "c_najem",
+              "plan": 14500.5,
+              "act": 14500.5,
+              "paid": true,
+              "paidAt": "2025-10-15",
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg92",
+              "cat": "c_jidlo",
+              "plan": 7000,
+              "act": 6842.35,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg93",
+              "cat": "c_rezerva",
+              "plan": 2000,
+              "act": 1999.99,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            }
+          ]
+        },
+        {
+          "m": 10,
+          "note": "",
+          "entries": [
+            {
+              "id": "e_leg100",
+              "cat": "c_vyplata",
+              "plan": 38000,
+              "act": 39250.75,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg101",
+              "cat": "c_najem",
+              "plan": 14500.5,
+              "act": 14500.5,
+              "paid": true,
+              "paidAt": "2025-11-15",
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg102",
+              "cat": "c_jidlo",
+              "plan": 7000,
+              "act": 6842.35,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            },
+            {
+              "id": "e_leg103",
+              "cat": "c_rezerva",
+              "plan": 2000,
+              "act": 1999.99,
+              "paid": false,
+              "paidAt": null,
+              "due": null,
+              "autoFilled": false,
+              "del": false,
+              "updatedAt": "2025-11-30T21:44:03.000Z"
+            }
+          ]
+        },
+        {
+          "m": 11,
+          "note": "",
+          "entries": []
+        }
+      ],
+      "tx": [
+        {
+          "id": "t_leg1",
+          "d": "2025-11-03",
+          "m": 10,
+          "cat": "c_jidlo",
+          "amt": 389.5,
+          "note": "Lidl",
+          "del": false,
+          "updatedAt": "2025-11-03T18:00:00.000Z"
+        },
+        {
+          "id": "t_leg2",
+          "d": "2025-11-08",
+          "m": 10,
+          "cat": "c_jidlo",
+          "amt": 1204.9,
+          "note": "Rohlík",
+          "del": false,
+          "updatedAt": "2025-11-08T09:12:00.000Z"
+        },
+        {
+          "id": "t_leg3",
+          "d": "2025-11-19",
+          "m": 10,
+          "cat": "c_jidlo",
+          "amt": 62,
+          "note": "Kafe",
+          "del": false,
+          "updatedAt": "2025-11-19T11:30:00.000Z"
+        }
+      ]
+    }
+  }
+}

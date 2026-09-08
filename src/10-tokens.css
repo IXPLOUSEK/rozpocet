@@ -1,0 +1,225 @@
+/* 10-tokens.css — jediné místo s barvami. Nikde jinde hex. — vlastní: L1
+   Struktura: kompletní SVĚTLÁ paleta na holém :root; tmavá se dopisuje
+   dvakrát — v @media (systémové téma) a v [data-theme="dark"] (přepínač
+   v appce), aby přepínač vyhrál v obou směrech. Žádná barva nesmí mít
+   jedinou definici uvnitř media query.
+
+   Ověřené kontrasty (WCAG 2.1, výpočet relativní luminance):
+     ink / bg                 světlo 19.67  tma 19.29
+     ink-2 / surface          světlo  7.23  tma  7.23
+     accent-ink / accent      světlo  6.29  tma  9.57
+     accent-text / surface    světlo  7.60  tma  9.57
+     pos / surface            světlo  5.07  tma  8.95
+     neg / surface            světlo  6.20  tma  6.41
+     warn / surface           světlo  4.76  tma  8.80
+     accent / bg (netextový)  světlo  6.29  tma 11.11
+   #F43F5E je zakázaná jako text i jako výplň pod bílým textem (3.67:1). */
+
+:root {
+  /* --- neutrální plochy --------------------------------------------- */
+  --bg: #FFFFFF;             /* stránka */
+  --surface: #FFF7F8;        /* karta */
+  --surface-2: #FFF1F2;      /* vnořený blok, hover, aktivní buňka */
+  --surface-3: #FFFFFF;      /* vyvýšené — sheet, toast na světle */
+  --header-bg: #FFF1F2;      /* shodné s <meta name="theme-color"> */
+  --hairline: #EADDE0;       /* 1.25:1 vůči surface — jen optický předěl */
+  --hairline-strong: #D6C3C7;/* 1.59:1 — obrys ovládacích prvků */
+
+  /* --- text ---------------------------------------------------------- */
+  --ink: #0B0B0C;            /* 18.65:1 na surface */
+  --ink-2: #57534E;          /*  7.23:1 na surface */
+  --ink-3: #6F6862;          /*  5.20:1 na surface, 4.99:1 na surface-2,
+                                 4.56:1 na accent-soft — projde všude */
+
+  /* --- akcent (tři tokeny: výplň, text na výplni, text na ploše) ------ */
+  --accent: #BE123C;         /* výplň tlačítek, FAB, aktivní chip */
+  --accent-ink: #FFFFFF;     /* 6.29:1 na --accent */
+  --accent-text: #9F1239;    /* 7.60:1 na --surface */
+  --accent-soft: #FFE4E6;    /* podklad; --accent-text na něm 6.68:1 */
+
+  /* --- stavy --------------------------------------------------------- */
+  --pos: #0F7A52;  --pos-soft: #DCF5E9;   /* 4.66:1 */
+  --neg: #B3261E;  --neg-soft: #FDE7E5;   /* 5.52:1 */
+  --warn: #B45309; --warn-soft: #FEF5E6;  /* 4.64:1 */
+
+  /* --- grafy a proužky ----------------------------------------------- */
+  --track: #E9D6DB;          /* dráha proužku, 1.32:1 vůči surface */
+  --meter-track: #E9D6DB;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #A6818C;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
+  --grid: #EADDE0;           /* mřížka v SVG */
+  --bar-plan-c: #7E7276;     /* plán — neutrální, 3.32:1 na --track */
+  --bar-act-c: #BE123C;      /* skutečnost, 4.52:1 na --track */
+  --bar-over-c: #B3261E;     /* přečerpáno, 5.24:1 na --track */
+
+  /* Kategoriální rampa. Střídá tmavý a středně světlý stupeň, takže
+     sousední kategorie se liší i jasem, ne jen odstínem. Každá ≥ 3:1
+     vůči --surface; sousední dvojice ≥ 1.67:1 mezi sebou. */
+  --cat-1: #9F1239;  --cat-2: #E11D74;  --cat-3: #115E59;  --cat-4: #0D9488;
+  --cat-5: #3730A3;  --cat-6: #2E7DD1;  --cat-7: #7C2D12;  --cat-8: #D97706;
+  --cat-9: #14532D;  --cat-10: #4D9A28; --cat-11: #5B21B6; --cat-12: #8E8388;
+
+  /* --- stíny a závoj -------------------------------------------------- */
+  --scrim: rgba(28, 20, 22, .42);
+  --shadow-1: rgba(88, 28, 44, .08);
+  --shadow-2: rgba(88, 28, 44, .12);
+  --shadow-3: rgba(88, 28, 44, .18);
+  --toast-bg: #2A2023;
+  --toast-ink: #F5F5F7;      /* 14.51:1 na --toast-bg */
+  --toast-accent: #FFC9CF;   /* 10.91:1 na --toast-bg */
+
+  /* --- rozestupy ------------------------------------------------------ */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px;
+
+  /* --- rádiusy -------------------------------------------------------- */
+  --r-xs: 6px;  --r-sm: 10px; --r-md: 14px;
+  --r-lg: 18px; --r-xl: 26px; --r-full: 999px;
+
+  /* --- stíny (hotové hodnoty) ------------------------------------------ */
+  --sh-1: 0 1px 2px var(--shadow-1);
+  --sh-2: 0 6px 20px var(--shadow-2);
+  --sh-3: 0 -6px 32px var(--shadow-3);
+
+  /* --- typografie ----------------------------------------------------- */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+             "Helvetica Neue", Arial, sans-serif;
+  --fs-xxs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-base: 15px;
+  --fs-md: 16px;  /* povinné minimum pro vstupy — iOS jinak zazoomuje */
+  --fs-lg: 17px;  --fs-xl: 20px; --fs-2xl: 28px; --fs-3xl: 34px;
+  /* Částky v buňkách: do 84px se „120 000 Kč“ v 15px nevejde
+     (75.9px textu na 76px místa). Na telefonu tedy 13px, od 700px
+     se buňka rozšíří na 104px a písmo se vrátí na 15px. */
+  --fs-amt: 13px;
+  --lh-tight: 1.15; --lh: 1.35; --lh-loose: 1.5;
+  --fw-reg: 400; --fw-med: 500; --fw-semi: 600; --fw-bold: 700;
+
+  /* --- rozměry skořápky ------------------------------------------------ */
+  --hit: 44px;              /* minimální dotyková plocha */
+  --h-header: 52px;
+  --h-strip: 52px;
+  --h-tabbar: 52px;
+  --rail-w: 220px;
+  --content-max: 1100px;
+  --sheet-max: 560px;
+  --cell-w: 84px;           /* šířka buňky s částkou při 390px */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --gutter: var(--sp-3);
+
+  /* --- pohyb ------------------------------------------------------------ */
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 300ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.32, .72, 0, 1);
+
+  /* --- vrstvy ------------------------------------------------------------ */
+  --z-base: 0; --z-sticky: 10; --z-fab: 20; --z-tabbar: 30;
+  --z-backdrop: 40; --z-sheet: 50; --z-banner: 60; --z-toast: 70;
+}
+
+/* ===================== TMA — systémové nastavení ======================= */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #1C1416;
+    --surface-2: #2A2023;
+    --surface-3: #241B1E;
+    --header-bg: #1C1416;
+    --hairline: #3A3033;
+    --hairline-strong: #4A3F43;
+    --ink: #F5F5F7;
+    --ink-2: #A9A2A4;
+    --ink-3: #9A9194;   /* 5.90 / 5.15 / 4.86 na surface / -2 / accent-soft */
+    --accent: #FDA4AF;
+    --accent-ink: #1C1416;
+    --accent-text: #FDA4AF;
+    --accent-soft: #3B1F27;
+    --pos: #30D158;  --pos-soft: #12301F;
+    --neg: #FF6961;  --neg-soft: #3A1D1B;
+    --warn: #FF9F0A; --warn-soft: #3A2A10;
+    --track: #342B2E;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
+    --grid: #3A3033;
+    --bar-plan-c: #9A8F92;
+    --bar-act-c: #FDA4AF;
+    --bar-over-c: #FF6961;
+    --cat-1: #FDA4AF;  --cat-2: #E8637F;  --cat-3: #5EEAD4;  --cat-4: #0E9A8E;
+    --cat-5: #A5B4FC;  --cat-6: #5B7FE0;  --cat-7: #FCD34D;  --cat-8: #C77A18;
+    --cat-9: #86EFAC;  --cat-10: #3E9E52; --cat-11: #D8B4FE; --cat-12: #9C9295;
+    --scrim: rgba(0, 0, 0, .60);
+    --shadow-1: rgba(0, 0, 0, .40);
+    --shadow-2: rgba(0, 0, 0, .55);
+    --shadow-3: rgba(0, 0, 0, .65);
+    --toast-bg: #3A3033;
+    --toast-ink: #F5F5F7;   /* 11.69:1 */
+    --toast-accent: #FDA4AF; /* 6.73:1 */
+  }
+}
+
+/* ===================== TMA — přepínač v aplikaci ======================= */
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1C1416;
+  --surface-2: #2A2023;
+  --surface-3: #241B1E;
+  --header-bg: #1C1416;
+  --hairline: #3A3033;
+  --hairline-strong: #4A3F43;
+  --ink: #F5F5F7;
+  --ink-2: #A9A2A4;
+  --ink-3: #9A9194;   /* 5.90 / 5.15 / 4.86 na surface / -2 / accent-soft */
+  --accent: #FDA4AF;
+  --accent-ink: #1C1416;
+  --accent-text: #FDA4AF;
+  --accent-soft: #3B1F27;
+  --pos: #30D158;  --pos-soft: #12301F;
+  --neg: #FF6961;  --neg-soft: #3A1D1B;
+  --warn: #FF9F0A; --warn-soft: #3A2A10;
+  --track: #342B2E;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
+  --grid: #3A3033;
+  --bar-plan-c: #9A8F92;
+  --bar-act-c: #FDA4AF;
+  --bar-over-c: #FF6961;
+  --cat-1: #FDA4AF;  --cat-2: #E8637F;  --cat-3: #5EEAD4;  --cat-4: #0E9A8E;
+  --cat-5: #A5B4FC;  --cat-6: #5B7FE0;  --cat-7: #FCD34D;  --cat-8: #C77A18;
+  --cat-9: #86EFAC;  --cat-10: #3E9E52; --cat-11: #D8B4FE; --cat-12: #9C9295;
+  --scrim: rgba(0, 0, 0, .60);
+  --shadow-1: rgba(0, 0, 0, .40);
+  --shadow-2: rgba(0, 0, 0, .55);
+  --shadow-3: rgba(0, 0, 0, .65);
+  --toast-bg: #3A3033;
+  --toast-ink: #F5F5F7;   /* 11.69:1 */
+  --toast-accent: #FDA4AF; /* 6.73:1 */
+}
+
+/* ===================== TISK — vždy světlá paleta ======================
+   Na papír se tiskne světle bez ohledu na téma. Selektory musí přebít
+   oba tmavé bloky, proto se opakují se stejnou specificitou a stojí
+   v souboru níž. Struktura tisku je v 15-print.css. */
+@media print {
+  :root,
+  :root:not([data-theme="light"]),
+  :root[data-theme="dark"] {
+    --bg: #FFFFFF;  --surface: #FFFFFF; --surface-2: #FFF7F8;
+    --surface-3: #FFFFFF; --header-bg: #FFFFFF;
+    --hairline: #C9BCC0; --hairline-strong: #A89A9E;
+    --ink: #000000; --ink-2: #3F3A38; --ink-3: #5C5551;
+    --accent: #BE123C; --accent-ink: #FFFFFF;
+    --accent-text: #9F1239; --accent-soft: #FFE4E6;
+    --pos: #0B5D3E; --neg: #8C1E17; --warn: #8A4007;
+    --pos-soft: #DCF5E9; --neg-soft: #FDE7E5; --warn-soft: #FEF5E6;
+    --track: #E0D2D6; --grid: #C9BCC0;
+  --meter-track: #342B2E;   /* dráha ukazatele — 3,2:1 vůči podkladu, ať je vidět, kde končí */
+  --meter-edge: #7C666E;    /* obrys ukazatele — 3,2:1 vůči podkladu, aby byl vidět jeho rozsah */
+    --bar-plan-c: #6B6165; --bar-act-c: #BE123C; --bar-over-c: #8C1E17;
+    --cat-1: #9F1239;  --cat-2: #E11D74;  --cat-3: #115E59;  --cat-4: #0D9488;
+    --cat-5: #3730A3;  --cat-6: #2E7DD1;  --cat-7: #7C2D12;  --cat-8: #D97706;
+    --cat-9: #14532D;  --cat-10: #4D9A28; --cat-11: #5B21B6; --cat-12: #8E8388;
+    --toast-bg: #2A2023; --toast-ink: #FFFFFF; --toast-accent: #FFC9CF;
+    --shadow-1: transparent; --shadow-2: transparent; --shadow-3: transparent;
+  }
+}

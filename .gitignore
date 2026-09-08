@@ -1,0 +1,4 @@
+node_modules/
+test/.out/
+test/artefakty/
+dist/artifact-test.html

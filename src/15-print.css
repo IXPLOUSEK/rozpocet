@@ -1,0 +1,99 @@
+/* 15-print.css — tisk a PDF — vlastní: L1
+   Nejčastější chyba appky, která si roluje uvnitř: vytiskne se jedna
+   obrazovka a nic víc. Proto se všem rodičům posuvné oblasti povinně
+   ruší výška, přetečení i pozicování. Barvy pro papír (vždy světlé)
+   jsou v @media print na konci 10-tokens.css. */
+
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  /* Bez tohohle Safari i Chrome vyhodí výplně proužků a podbarvení. */
+  *, *::before, *::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* 1) Rozbalit posuvnou skořápku na jeden souvislý tok. */
+  html, body, #app, #main, .screen, #screen-print, .sec-rows, .sec-card, .card,
+  .tx-day, .tx-day-list, .chart-card, .goal-card {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+  /* break-inside prohlížeč ignoruje u přímých potomků flexu a mřížky,
+     takže kontejnery kolem tištěných karet a řádků musí být bloky. */
+  #app, #main, .screen, .screen.is-active, .sec-rows, .card, .sec-card,
+  .tx-day, .tx-day-list, .goal-card, .chart-card {
+    display: block !important;
+  }
+  html, body {
+    background: var(--bg) !important;
+    color: var(--ink) !important;
+    font-size: 11pt;
+  }
+  #app { padding: 0 !important; }
+  #main { padding: 0 !important; }
+  .screen.is-active { gap: 0 !important; padding: 0 !important; max-width: none !important; }
+
+  /* 2) Skrýt všechno, co na papíře nedává smysl. */
+  .app-header, .month-strip, .tabbar, .fab, .sheet, .sheet-backdrop,
+  #sheet-host, #banner-host, .banner, .toast, .toast-host, .sec-add,
+  .row-paid, .sec-chevron, .goal-edit, .sheet-close, .alert-chevron,
+  /* Musí přebít i pravidla s #id, jinak se vedle tiskového náhledu
+     vytiskne i živá obrazovka pod ním. */
+  .no-print,
+  #app .no-print,
+  #main.no-print,
+  #app.no-print { display: none !important; }
+
+  /* 3) Tisková obrazovka se naopak ukáže. */
+  .print-only { display: block !important; }
+
+  /* 4) Nerozsekat karty ani řádky přes zlom stránky. */
+  .card, .sec-card, .row, .tx, .yrow, .due-item, .goal-card, .chart-card,
+  .kpi, .tx-day-head { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3, h4, .sec-head, .sec-title, .chart-title, .tx-day-head {
+    break-after: avoid; page-break-after: avoid;
+  }
+  .card { margin-bottom: 5mm; border: 1px solid var(--hairline) !important;
+          border-radius: 0 !important; }
+  .sec-card { margin-bottom: 6mm; }
+
+  /* 5) Částky musí na papír vytisknout NAFORMÁTOVANOU hodnotu, ne
+        surové číslo ze vstupu. */
+  .cell { position: static !important; height: auto !important; display: block !important; }
+  .amt { display: none !important; }
+  .amt-display {
+    position: static !important;
+    visibility: visible !important;
+    display: block !important;
+    text-align: right;
+    padding-inline: 0;
+    font-size: 10pt;
+    color: var(--ink) !important;
+  }
+
+  /* 6) Drobnosti, aby to na A4 sedělo. */
+  .row { padding-inline: 3mm; grid-template-columns: minmax(0, 1fr) 26mm 26mm; }
+  .row-main { padding-block: 1mm; }
+  .row-name { white-space: normal; }
+  .kpi-value { font-size: 16pt; }
+  .sec-title { color: var(--ink) !important; }
+  a[href] { text-decoration: none; color: inherit; }
+
+  /* Na papíře se nic neuřezává třemi tečkami — místa je dost, ať se to
+     radši zalomí. Uřízlý název kategorie je v tištěném přehledu k ničemu. */
+  .chart-legend-name,
+  .row-name,
+  .tx-name,
+  .goal-name,
+  .yrow-month {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+}
