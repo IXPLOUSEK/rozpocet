@@ -55,6 +55,7 @@ node tools/gate.mjs     # statické brány: žádné innerHTML, žádné cizí o
 node tools/smoke.mjs    # integrační test v prohlížeči
 ./tools/wk.sh tools/smoke.mjs --webkit   # totéž v opravdovém WebKitu (kontejner)
 node tools/soukromi.mjs # důkaz, že data neopouštějí zařízení (proti nasazené adrese)
+node tools/pisecky.mjs  # tři lidé na jednom odkazu, tři oddělená data
 node tools/live.mjs     # kontrola nasazené adresy
 ./tools/deploy.sh       # nasazení na GitHub Pages (po `gh auth login`)
 node test/run.mjs all   # celá testovací sada
